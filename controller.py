@@ -25,10 +25,39 @@ from flask import Flask, request, make_response
 
 from keyrock_client import KeyrockClient, KeyrockError
 from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
-     BAE_APP_ID, BAE_ROLES
+     BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE
 
 
 app = Flask(__name__)
+
+
+def _organization_based_tenant(keyrock_client, user_info):
+    # This method seems not be usable due to the new Keyrock v7 implementation    
+    org_id = keyrock_client.create_organization(
+        request.json.get('tenant'), request.json.get('description'), user_info['id'])
+
+    # Add context broker role
+    keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ROLES)
+
+    # Add BAE roles
+    keyrock_client.authorize_organization(org_id, BAE_APP_ID, BAE_ROLES)
+
+
+def _app_based_tenant(keyrock_client, user_info):
+    broker_app = keyrock_client.get_application(BROKER_APP_ID)
+
+    # Create new application for the broker tenant
+    app_id = keyrock_client.create_application(
+        request.json.get('tenant'), request.json.get('description'),
+        broker_app['application']['url'], broker_app['application']['redirect_uri'])
+
+    # Create broker roles
+    for role in BROKER_ROLES:
+        keyrock_client.create_role(app_id, role)
+
+    # Grant provider role to tenant owner
+    keyrock_client.grant_application_role(app_id, user_info['id'], 'provider')
+
 
 @app.route("/tenant", methods=['POST'])
 def create():
@@ -58,15 +87,8 @@ def create():
         }), 401)
 
     try:
-        org_id = keyrock_client.create_organization(
-            request.json.get('tenant'), request.json.get('description'), user_info['id'])
-
-        # Add context broker role
-        keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ROLES)
-
-        # Add BAE roles
-        keyrock_client.authorize_organization(org_id, BAE_APP_ID, BAE_ROLES)
-
+        _app_based_tenant(keyrock_client, user_info)
+        #_organization_based_tenant(keyrock_client, user_info)
     except KeyrockError as e:
         return make_response(json.dumps({
             'error': str(e)

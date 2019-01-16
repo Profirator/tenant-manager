@@ -35,6 +35,16 @@ class KeyrockClient():
         self._host = host
         self.login(user, passwd)
 
+    def _list_resources(self, url, err):
+        response = requests.get(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 200:
+            raise KeyrockError(err)
+
+        return response.json()
+
     def login(self, user, passwd):
         body = {
             'name': user,
@@ -78,6 +88,75 @@ class KeyrockClient():
 
         if response.status_code != 201:
             raise KeyrockError('Keyrock failed assigning role {} in organization'.format(role_id))
+
+    def grant_application_role(self, app_id, user, role_id):
+        """
+        """
+        url = urljoin(self._host, '/v1/applications/{}/users/{}/roles/{}'.format(app_id, user, role_id))
+        response = requests.post(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 201:
+            raise KeyrockError('Keyrock failed assigning role')
+
+    def create_role(self, app_id, name):
+        """
+        """
+        url = urljoin(url, '/v1/applications/{}/roles'.format(app_id))
+        body = {
+            'role': {
+                'name': name
+            }
+        }
+
+        response = requests.post(url, headers={
+            'X-Auth-Token': self._access_token
+        }, json=body, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 201:
+            raise KeyrockError('Keyrock failed creating role')
+
+        return response.json()['role']['id']
+
+    def get_application_roles(self, app_id):
+        """
+        """
+        url = urljoin(url, '/v1/applications/{}/roles'.format(app_id))
+        return self._list_resources(url, 'Keyrock failed retrieving application roles')
+
+    def get_application(self, app_id):
+        """
+        """
+        url = urljoin(self._host, '/v1/applications/{}'.format(app_id))
+        return self._list_resources(url, 'Application cannot be found')
+
+    def create_application(self, name, description, app_url, app_redirect):
+        """
+        """
+        url = urljoin(self._host, '/v1/applications')
+        body = {
+            "application": {
+                "name": name,
+                "description": description,
+                "redirect_uri": app_redirect,
+                "url": app_url,
+                "grant_type": [
+                    "authorization_code",
+                    "implicit",
+                    "password"
+                ]
+            }
+        }
+
+        response = requests.post(url, headers={
+            'X-Auth-Token': self._access_token
+        }, json=body, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 201:
+            raise KeyrockError('Keyrock failed creating application')
+
+        return response.json()['application']['id']
 
     def create_organization(self, name, description, owner):
         """

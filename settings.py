@@ -26,7 +26,10 @@ IDM_USER = 'fdelavega@conwet.com'
 IDM_PASSWD = '123456789'
 
 BROKER_APP_ID = ''
-BROKER_ROLES = ['data-consumer', 'data-provider']
+BROKER_ADMIN_ROLE = 'data-provider'
+BROKER_CONSUMER_ROLE = 'data-consumer'
+
+BROKER_ROLES = ['data-provider', 'data-consumer']
 
 BAE_APP_ID = ''
 BAE_ROLES = ['seller', 'customer', 'orgAdmin']
