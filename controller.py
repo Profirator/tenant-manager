@@ -17,16 +17,66 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os
 import json
 import logging
 
 from flask import Flask, request, make_response
 
+from keyrock_client import KeyrockClient, KeyrockError
+from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
+     BAE_APP_ID, BAE_ROLES
+
+
 app = Flask(__name__)
 
 @app.route("/tenant", methods=['POST'])
 def create():
-    pass
+    # Get tenant info for JSON request
+    if 'tenant' not in request.json:
+        return make_response(json.dumps({
+            'error': 'Missing required field tenant'
+        }), 422)
+
+    if 'authorization' not in request.headers or \
+            not request.headers.get('authorization').lower().startswith('bearer '):
+
+        return make_response(json.dumps({
+            'error': 'This request requires authentication'
+        }), 401)
+
+    keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+
+    # Authorize user making the request
+    token = request.headers.get('authorization').split(' ')[1]
+
+    try:
+        user_info = keyrock_client.authorize(token)
+    except:
+        return make_response(json.dumps({
+            'error': 'This request requires authentication'
+        }), 401)
+
+    try:
+        org_id = keyrock_client.create_organization(
+            request.json.get('tenant'), request.json.get('description'), user_info['id'])
+
+        # Add context broker role
+        keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ROLES)
+
+        # Add BAE roles
+        keyrock_client.authorize_organization(org_id, BAE_APP_ID, BAE_ROLES)
+
+    except KeyrockError as e:
+        return make_response(json.dumps({
+            'error': str(e)
+        }), 400)
+    except Exception:
+        return make_response(json.dumps({
+            'error': 'Unexpected error creating tenant'
+        }), 500)
+
+    return make_response('', 201)
 
 
 if __name__ == '__main__':
