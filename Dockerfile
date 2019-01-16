@@ -2,7 +2,7 @@ FROM pypy:3-6
 ENV LOGLEVEL=info
 
 COPY requirements.txt requirements.txt
-RUN pip install -f requirements.txt
+RUN pip install -r requirements.txt
 
 COPY controller.py /controller.py
 
