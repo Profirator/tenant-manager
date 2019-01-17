@@ -32,6 +32,10 @@ BROKER_CONSUMER_ROLE = 'data-consumer'
 BROKER_ROLES = ['data-provider', 'data-consumer']
 
 BAE_APP_ID = ''
+BAE_SELLER_ROLE = 'seller'
+BAE_CUSTOMER_ROLE = 'customer'
+BAE_ADMIN_ROLE = 'orgAdmin'
+
 BAE_ROLES = ['seller', 'customer', 'orgAdmin']
 
 

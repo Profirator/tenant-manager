@@ -25,7 +25,8 @@ from flask import Flask, request, make_response
 
 from keyrock_client import KeyrockClient, KeyrockError
 from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
-     BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE
+     BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
+     BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE
 
 
 app = Flask(__name__)
@@ -37,11 +38,12 @@ def _organization_based_tenant(keyrock_client, user_info):
         request.json.get('tenant'), request.json.get('description'), user_info['id'])
 
     # Add context broker role
-    keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ROLES)
+    keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE)
 
     # Add BAE roles
-    keyrock_client.authorize_organization(org_id, BAE_APP_ID, BAE_ROLES)
-
+    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_SELLER_ROLE, 'owner')
+    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_CUSTOMER_ROLE, 'owner')
+    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
 
 def _app_based_tenant(keyrock_client, user_info):
     broker_app = keyrock_client.get_application(BROKER_APP_ID)
@@ -87,8 +89,8 @@ def create():
         }), 401)
 
     try:
-        _app_based_tenant(keyrock_client, user_info)
-        #_organization_based_tenant(keyrock_client, user_info)
+        #_app_based_tenant(keyrock_client, user_info)
+        _organization_based_tenant(keyrock_client, user_info)
     except KeyrockError as e:
         return make_response(json.dumps({
             'error': str(e)

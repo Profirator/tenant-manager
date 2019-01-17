@@ -207,29 +207,32 @@ class KeyrockClient():
 
         return role_id
 
-    def authorize_organization(self, organization_id, app_id, roles):
+    def authorize_organization_role(self, organization_id, app_id, app_role, org_role):
+        role_id = self.get_role_id(app_id, app_role)
+        url = urljoin(self._host,
+            '/v1/applications/{}/organizations/{}/roles/{}/organization_roles/{}'.format(app_id, organization_id, role_id, org_role))
+
+        body = {
+            'role_organization_assignments': {
+                'role_id': role_id,
+                'organization_id': organization_id,
+                'oauth_client_id': app_id,
+                'role_organization': org_role
+            }
+        }
+
+        response = requests.post(url, {
+            'X-Auth-Token': self._access_token
+        }, json=body, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 201:
+            raise KeyrockError('Role {} cannot be asigned to organization'.format(app_role))
+
+    def authorize_organization(self, organization_id, app_id, admin_role, member_role):
         """
         Authorizes a given organization in a particular application by
         granting it a set of roles
         """
 
-        for role in roles:
-            role_id = self.get_role_id(app_id, role)
-            url = urljoin(self._host,
-                '/v1/applications/{}/organizations/{}/roles/{}/organization_roles/member'.format(app_id, organization_id, role_id))
-
-            body = {
-                'role_organization_assignments': {
-                    'role_id': role_id,
-                    'organization_id': organization_id,
-                    'oauth_client_id': app_id,
-                    'role_organization': 'member'
-                }
-            }
-
-            response = requests.post(url, {
-                'X-Auth-Token': self._access_token
-            }, json=body, verify=VERIFY_REQUESTS)
-
-            if response.status_code != 201:
-                raise KeyrockError('Role {} cannot be asigned to organization'.format(role))
+        self.authorize_organization_role(organization_id, app_id, admin_role, 'owner')
+        self.authorize_organization_role(organization_id, app_id, member_role, 'member')
