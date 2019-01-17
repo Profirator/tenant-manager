@@ -221,7 +221,7 @@ class KeyrockClient():
             }
         }
 
-        response = requests.post(url, {
+        response = requests.post(url, headers={
             'X-Auth-Token': self._access_token
         }, json=body, verify=VERIFY_REQUESTS)
 

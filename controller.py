@@ -23,7 +23,7 @@ import logging
 
 from flask import Flask, request, make_response
 
-from keyrock_client import KeyrockClient, KeyrockError
+from lib.keyrock_client import KeyrockClient, KeyrockError
 from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
      BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
      BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE

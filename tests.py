@@ -20,7 +20,7 @@
 import unittest
 from unittest.mock import MagicMock, call
 
-import keyrock_client
+from lib import keyrock_client
 from settings import VERIFY_REQUESTS
 
 
