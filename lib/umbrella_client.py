@@ -21,7 +21,11 @@ import requests
 
 from urllib.parse import urlparse, urljoin
 
+from settings import VERIFY_REQUESTS
+
+
 PAGE_LEN = 100
+
 
 class UmbrellaError(Exception):
     pass
@@ -38,11 +42,12 @@ class UmbrellaClient():
         self._admin_token = admin_token
         self._api_key = api_key
 
-    def get_api_from_url(self, url):
-        parsed_url = urlparse(url)
-
-        # To limit the number of results, include a search by expected URL
-        url = urljoin(self._host, '/api-umbrella/v1/apis.json?search[value]={}&search[regex]=false'.format(parsed_url.netloc))
+    def get_api_from_app_id(self, app_id):
+        """
+        Searches in API Umbrella for an API which is configured with a particular IDM app ID
+        """
+        # To limit the number of results, include a search by expected app_id
+        url = urljoin(self._host, '/api-umbrella/v1/apis.json?search[value]={}&search[regex]=false'.format(app_id))
 
         start = 0
         processed = False
@@ -53,7 +58,7 @@ class UmbrellaClient():
             response = requests.get(url, headers={
                 'X-Api-Key': self._api_key,
                 'X-Admin-Auth-Token': self._admin_token
-            })
+            }, verify=VERIFY_REQUESTS)
 
             if response.status_code == 401 or response.status_code == 403:
                 raise UmbrellaError('Permissions error accessing API Umbrella')
@@ -67,9 +72,8 @@ class UmbrellaClient():
                 raise UmbrellaError('API not found in API Umbrella')
 
             for api in apis['data']:
-                api_url = urlparse(api['external_url'])
 
-                if api_url.netloc == parsed_url.netloc and api['frontend_prefixes'] == parsed_url.path:
+                if api['settings']['idp_app_id'] == app_id:
                     processed = True
                     api_elem = api
                     break
@@ -78,5 +82,23 @@ class UmbrellaClient():
 
         return api_elem
 
-    def add_sub_url_setting(self, setting):
-        pass
+    def add_sub_url_setting_app_id(self, app_id, sub_settings):
+        """
+        Appends a new sub URL setting into an API Umbrella API
+        identified by IDM app ID
+        """
+        api_elem = self.get_api_from_app_id(app_id)
+        api_elem['sub_settings'].extend(sub_settings)
+
+        url = urljoin(self._host, '/api-umbrella/v1/apis/{}'.format(api_elem['id']))
+
+        response = requests.put(url, headers={
+            'X-Api-Key': self._api_key,
+            'X-Admin-Auth-Token': self._admin_token
+        }, json=api_elem, verify=VERIFY_REQUESTS
+
+        if response.status_code == 401 or response.status_code == 403:
+            raise UmbrellaError('Permissions error accessing API Umbrella')
+
+        if response.status_code != 204:
+            raise UmbrellaError('Error adding sub setting to API')

@@ -24,9 +24,10 @@ import logging
 from flask import Flask, request, make_response
 
 from lib.keyrock_client import KeyrockClient, KeyrockError
+from lib.umbrella_client import UmbrellaClient, UmbrellaError
 from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
      BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
-     BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE
+     BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_HOST, UMBRELLA_TOKEN, UMBRELLA_KEY
 
 
 app = Flask(__name__)
@@ -61,6 +62,38 @@ def _app_based_tenant(keyrock_client, user_info):
     keyrock_client.grant_application_role(app_id, user_info['id'], 'provider')
 
 
+def _build_policy(method, tenant, role):
+    return {
+        "http_method": method,
+        "regex": "^/",
+        "settings": {
+            "required_headers": [{
+                "key": "Fiware-Service",
+                "value": tenant
+            }],
+            "required_roles": [
+                role
+            ],
+            "required_roles_override": True
+        }
+    }
+
+
+def _create_access_policies(user_info):
+    # Build read and admin policies
+    tenant = request.json.get('tenant')
+
+    read_role = tenant.lower().replace(' ', '-') + '.' + BROKER_CONSUMER_ROLE
+    read_policy = _build_policy('get', tenant, read_role)
+
+    admin_role = tenant.lower().replace(' ', '-') + '.' + BROKER_ADMIN_ROLE
+    admin_policy = _build_policy('any', tenant, admin_role)
+
+    # Add new policies to existing API sub settings
+    umbrella_client = UmbrellaClient(UMBRELLA_HOST, UMBRELLA_TOKEN, UMBRELLA_KEY)
+    umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
+
+
 @app.route("/tenant", methods=['POST'])
 def create():
     # Get tenant info for JSON request
@@ -91,7 +124,8 @@ def create():
     try:
         #_app_based_tenant(keyrock_client, user_info)
         _organization_based_tenant(keyrock_client, user_info)
-    except KeyrockError as e:
+        _create_access_policies(user_info)
+    except (KeyrockError, UmbrellaError) as e:
         return make_response(json.dumps({
             'error': str(e)
         }), 400)

@@ -38,6 +38,9 @@ BAE_ADMIN_ROLE = 'orgAdmin'
 
 BAE_ROLES = ['seller', 'customer', 'orgAdmin']
 
+UMBRELLA_HOST = ''
+UMBRELLA_TOKEN = ''
+UMBRELLA_KEY = ''
 
 # Configure using env variables
 IDM_HOST = os.environ.get('TENANT_IDM_HOST', IDM_HOST)
