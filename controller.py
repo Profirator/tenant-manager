@@ -23,6 +23,7 @@ import logging
 
 from flask import Flask, request, make_response
 
+from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
 from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
@@ -45,6 +46,8 @@ def _organization_based_tenant(keyrock_client, user_info):
     keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_SELLER_ROLE, 'owner')
     keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_CUSTOMER_ROLE, 'owner')
     keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
+
+    return org_id
 
 def _app_based_tenant(keyrock_client, user_info):
     broker_app = keyrock_client.get_application(BROKER_APP_ID)
@@ -94,18 +97,24 @@ def _create_access_policies(user_info):
     umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
 
 
+def _build_response(body, status):
+    resp = make_response(json.dumps(body), status)
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
 @app.route("/tenant", methods=['POST'])
 def create():
     # Get tenant info for JSON request
     if 'tenant' not in request.json:
-        return make_response(json.dumps({
+        return _build_response(json.dumps({
             'error': 'Missing required field tenant'
         }), 422)
 
     if 'authorization' not in request.headers or \
             not request.headers.get('authorization').lower().startswith('bearer '):
 
-        return make_response(json.dumps({
+        return _build_response(json.dumps({
             'error': 'This request requires authentication'
         }), 401)
 
@@ -117,24 +126,60 @@ def create():
     try:
         user_info = keyrock_client.authorize(token)
     except:
-        return make_response(json.dumps({
+        return _build_response(json.dumps({
             'error': 'This request requires authentication'
         }), 401)
 
     try:
         #_app_based_tenant(keyrock_client, user_info)
-        _organization_based_tenant(keyrock_client, user_info)
+        org_id = _organization_based_tenant(keyrock_client, user_info)
         _create_access_policies(user_info)
+
+        database_controller = DatabaseController()
+        database_controller.save_tenant(name, description, user_info['id'], org_id)
     except (KeyrockError, UmbrellaError) as e:
-        return make_response(json.dumps({
+        return _build_response(json.dumps({
             'error': str(e)
         }), 400)
     except Exception:
-        return make_response(json.dumps({
+        return _build_response(json.dumps({
             'error': 'Unexpected error creating tenant'
         }), 500)
 
     return make_response('', 201)
+
+
+@app.route("/tenant", methods=['GET'])
+def get():
+    if 'authorization' not in request.headers or \
+            not request.headers.get('authorization').lower().startswith('bearer '):
+
+        return _build_response(json.dumps({
+            'error': 'This request requires authentication'
+        }), 401)
+
+    keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+
+    # Authorize user making the request
+    token = request.headers.get('authorization').split(' ')[1]
+
+    try:
+        user_info = keyrock_client.authorize(token)
+    except:
+        return _build_response(json.dumps({
+            'error': 'This request requires authentication'
+        }), 401)
+
+    response_data = []
+    try:
+        database_controller = DatabaseController()
+        response_data = database_controller.read_tenants(user_info['id'])
+    except:
+        return _build_response(json.dumps({
+            'error': 'An error occurred reading tenants'
+        }), 500)
+
+    return _build_response(json.dumps(response_data), 200)
 
 
 if __name__ == '__main__':
