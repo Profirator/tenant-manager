@@ -31,6 +31,15 @@ class KeyrockClientTestCase(unittest.TestCase):
     _user = 'user'
     _passwd = 'passwd'
 
+    _headers = {
+        'X-Auth-Token': _x_subject_token
+    }
+
+    _exp_body = {
+        'name': _user,
+        'password': _passwd
+    }
+
     def setUp(self):
         keyrock_client.requests = MagicMock()
 
@@ -56,11 +65,7 @@ class KeyrockClientTestCase(unittest.TestCase):
         # validate calls
         self.assertEqual(expected_info, info)
 
-        exp_body = {
-            'name': self._user,
-            'password': self._passwd
-        }
-        keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=exp_body, verify=VERIFY_REQUESTS)
+        keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS)
         keyrock_client.requests.get.assert_called_once_with('http://idm.docker:3000/user?access_token=access_token')
         user_response.json.assert_called_once_with()
 
@@ -86,13 +91,6 @@ class KeyrockClientTestCase(unittest.TestCase):
         # Verify calls
         self.assertEqual('org_id', org_id)
 
-        headers = {
-            'X-Auth-Token': self._x_subject_token
-        }
-        exp_body = {
-            'name': self._user,
-            'password': self._passwd
-        }
         org_body = {
             'organization': {
                 'name': 'organization',
@@ -108,9 +106,67 @@ class KeyrockClientTestCase(unittest.TestCase):
         }
         post_calls = keyrock_client.requests.post.call_args_list
         self.assertEqual([
-            call('http://idm.docker:3000/v3/auth/tokens', json=exp_body, verify=VERIFY_REQUESTS),
-            call('http://idm.docker:3000/v1/organizations', headers=headers, json=org_body, verify=VERIFY_REQUESTS),
-            call('http://idm.docker:3000/v1/organizations/org_id/users/owner/organization_roles/owner', headers=headers, json=role_body, verify=VERIFY_REQUESTS)
+            call('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/organizations', headers=self._headers, json=org_body, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/organizations/org_id/users/owner/organization_roles/owner', headers=self._headers, json=role_body, verify=VERIFY_REQUESTS)
+        ], post_calls)
+
+    def test_authorize_organization(self):
+        # Mock login
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        # Mock get roles
+        roles = {
+            'roles': [{
+                'name': 'data-provider',
+                'id': '1'
+            }, {
+                'name': 'data-consumer',
+                'id': '2'
+            }]
+        }
+        get_roles_response = MagicMock(status_code=200)
+        get_roles_response.json.return_value = roles
+
+        # Mock authorize organization
+        authorize_response = MagicMock(status_code=201)
+
+        keyrock_client.requests.get.return_value = get_roles_response
+        keyrock_client.requests.post.side_effect = [login_response, authorize_response, authorize_response]
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        client.authorize_organization('org_id', 'app_id', 'data-provider', 'data-consumer')
+
+        # Validate calls
+        get_calls = keyrock_client.requests.get.call_args_list
+        self.assertEqual([
+            call('http://idm.docker:3000/v1/applications/app_id/roles', headers=self._headers, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/applications/app_id/roles', headers=self._headers, verify=VERIFY_REQUESTS)
+        ], get_calls)
+
+        owner_body = {
+            'role_organization_assignments': {
+                'role_id': '1',
+                'organization_id': 'org_id',
+                'oauth_client_id': 'app_id',
+                'role_organization': 'owner'
+            }
+        }
+
+        member_body = {
+            'role_organization_assignments': {
+                'role_id': '2',
+                'organization_id': 'org_id',
+                'oauth_client_id': 'app_id',
+                'role_organization': 'member'
+            }
+        }
+
+        post_calls = keyrock_client.requests.post.call_args_list
+        self.assertEqual([
+            call('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/1/organization_roles/owner', json=owner_body, headers=self._headers, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/2/organization_roles/member', json=member_body, headers=self._headers, verify=VERIFY_REQUESTS)
         ], post_calls)
 
 
