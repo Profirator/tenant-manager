@@ -1,6 +1,6 @@
 # Opplafy Tenant Manager
 
-[![Build Status](https://travis-ci.org/opplafy/tenant-manager.svg?branch=master)](https://travis-ci.org/opplafy/tenant-manager)
+[![Build Status](https://travis-ci.org/opplafy/tenant-manager.svg?branch=master)](https://travis-ci.org/opplafy/tenant-manager) [![Coverage Status](https://coveralls.io/repos/github/opplafy/tenant-manager/badge.svg?branch=master)](https://coveralls.io/github/opplafy/tenant-manager?branch=master)
 
 This repository includes the [Opplafy](https://www.opplafy.eu/en/) 
 Tenant Manager software. This service is intended to simplify the creation and 
