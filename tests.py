@@ -20,7 +20,7 @@
 import unittest
 from unittest.mock import MagicMock, call
 
-from lib import keyrock_client
+from lib import keyrock_client, umbrella_client
 from settings import VERIFY_REQUESTS
 
 
@@ -168,6 +168,74 @@ class KeyrockClientTestCase(unittest.TestCase):
             call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/1/organization_roles/owner', json=owner_body, headers=self._headers, verify=VERIFY_REQUESTS),
             call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/2/organization_roles/member', json=member_body, headers=self._headers, verify=VERIFY_REQUESTS)
         ], post_calls)
+
+
+class UmbrellaClientTestCase(unittest.TestCase):
+
+    _host = 'http://umbrella.docker/'
+    _admin_token = 'token'
+    _api_key = 'api_key'
+
+    def test_add_sub_setting(self):
+        # Mock get request
+        apis = {
+            'data': [{
+                'settings': {
+                    'idp_app_id': '1'
+                }
+            }, {
+                'id': 'id',
+                'settings': {
+                    'idp_app_id': '2'
+                }
+            }]
+        }
+        get_response = MagicMock(status_code=200)
+        get_response.json.return_value = apis
+
+        umbrella_client.requests = MagicMock()
+        umbrella_client.requests.get.return_value = get_response
+
+        # Mock put request
+        umbrella_client.requests.put.return_value = MagicMock(status_code=204)
+
+        client = umbrella_client.UmbrellaClient(self._host, self._admin_token, self._api_key)
+        client.add_sub_url_setting_app_id('2', [{
+            'regex': '/',
+            'http_method': 'any'
+        }, {
+            'regex': '/',
+            'http_method': 'get'
+        }])
+
+        headers = {
+            'X-Api-Key': self._api_key,
+            'X-Admin-Auth-Token': self._admin_token
+        }
+
+        exp_body = {
+            'id': 'id',
+            'settings': {
+                'idp_app_id': '2'
+            },
+            'sub_settings': [{
+                'regex': '/',
+                'http_method': 'any'
+            }, {
+                'regex': '/',
+                'http_method': 'get'
+            }]
+        }
+
+        # Verify calls
+        umbrella_client.requests.get.assert_called_once_with(
+            'http://umbrella.docker/api-umbrella/v1/apis.json?search[value]=2&search[regex]=false&start=0&length=100',
+            headers=headers, verify=VERIFY_REQUESTS)
+
+        umbrella_client.requests.put.assert_called_once_with(
+            'http://umbrella.docker/api-umbrella/v1/apis/id',
+            headers=headers, json=exp_body, verify=VERIFY_REQUESTS
+        )
 
 
 if __name__ == "__main__":
