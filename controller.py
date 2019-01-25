@@ -37,7 +37,7 @@ app = Flask(__name__)
 def _organization_based_tenant(keyrock_client, user_info):
     # This method seems not be usable due to the new Keyrock v7 implementation    
     org_id = keyrock_client.create_organization(
-        request.json.get('tenant'), request.json.get('description'), user_info['id'])
+        request.json.get('name'), request.json.get('description'), user_info['id'])
 
     # Add context broker role
     keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE)
@@ -54,7 +54,7 @@ def _app_based_tenant(keyrock_client, user_info):
 
     # Create new application for the broker tenant
     app_id = keyrock_client.create_application(
-        request.json.get('tenant'), request.json.get('description'),
+        request.json.get('name'), request.json.get('description'),
         broker_app['application']['url'], broker_app['application']['redirect_uri'])
 
     # Create broker roles
@@ -84,7 +84,7 @@ def _build_policy(method, tenant, role):
 
 def _create_access_policies(user_info):
     # Build read and admin policies
-    tenant = request.json.get('tenant')
+    tenant = request.json.get('name')
 
     read_role = tenant.lower().replace(' ', '-') + '.' + BROKER_CONSUMER_ROLE
     read_policy = _build_policy('get', tenant, read_role)
@@ -106,9 +106,14 @@ def _build_response(body, status):
 @app.route("/tenant", methods=['POST'])
 def create():
     # Get tenant info for JSON request
-    if 'tenant' not in request.json:
+    if 'name' not in request.json:
         return _build_response(json.dumps({
-            'error': 'Missing required field tenant'
+            'error': 'Missing required field name'
+        }), 422)
+
+    if 'description' not in request.json:
+        return _build_response(json.dumps({
+            'error': 'Missing required field description'
         }), 422)
 
     if 'authorization' not in request.headers or \
@@ -136,7 +141,9 @@ def create():
         _create_access_policies(user_info)
 
         database_controller = DatabaseController()
-        database_controller.save_tenant(name, description, user_info['id'], org_id)
+        database_controller.save_tenant(
+            request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
+
     except (KeyrockError, UmbrellaError) as e:
         return _build_response(json.dumps({
             'error': str(e)

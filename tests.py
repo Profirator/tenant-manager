@@ -20,6 +20,7 @@
 import unittest
 from unittest.mock import MagicMock, call
 
+import controller
 from lib import keyrock_client, umbrella_client
 from settings import VERIFY_REQUESTS
 
@@ -236,6 +237,116 @@ class UmbrellaClientTestCase(unittest.TestCase):
             'http://umbrella.docker/api-umbrella/v1/apis/id',
             headers=headers, json=exp_body, verify=VERIFY_REQUESTS
         )
+
+
+class ControllerTestCase(unittest.TestCase):
+
+    _broker_app = 'broker_app'
+    _admin_role = 'broker_admin'
+    _consumer_role = 'broker_consumer'
+    _bae_app = 'bae_app'
+    _bae_seller = 'seller'
+    _bae_customer = 'customer'
+    _bae_admin = 'admin'
+
+    def setUp(self):
+        # Mock controller dependencies
+        controller.request = MagicMock()
+
+        self._response = MagicMock()
+        controller.make_response = MagicMock(return_value=self._response)
+
+        self._keyrock_client = MagicMock()
+        self._keyrock_client.authorize.return_value = {
+            'id': 'user-id'
+        }
+
+        controller.KeyrockClient = MagicMock(return_value=self._keyrock_client)
+
+        self._umbrella_client = MagicMock()
+        controller.UmbrellaClient = MagicMock(return_value=self._umbrella_client)
+
+        self._database_controller = MagicMock()
+        controller.DatabaseController = MagicMock(return_value=self._database_controller)
+
+        controller.BROKER_APP_ID = self._broker_app
+        controller.BROKER_ADMIN_ROLE = self._admin_role
+        controller.BROKER_CONSUMER_ROLE = self._consumer_role
+        controller.BAE_APP_ID = self._bae_app
+        controller.BAE_SELLER_ROLE = self._bae_seller
+        controller.BAE_CUSTOMER_ROLE = self._bae_customer
+        controller.BAE_ADMIN_ROLE = self._bae_admin
+
+    def test_create_tenant(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'tenant',
+            'description': 'tenant description'
+        }
+
+        controller.request.headers = {
+            'authorization': 'Bearer access-token'
+        }
+
+        self._keyrock_client.create_organization.return_value = 'org_id'
+
+        response = controller.create()
+
+        # Validate calls
+        self.assertEqual(self._response, response)
+        controller.make_response.assert_called_once_with('', 201)
+
+        self._keyrock_client.authorize.assert_called_once_with('access-token')
+        self._keyrock_client.create_organization.assert_called_once_with('tenant', 'tenant description', 'user-id')
+
+        self._keyrock_client.authorize_organization.assert_called_once_with(
+            'org_id', self._broker_app, self._admin_role, self._consumer_role
+        )
+
+        authorize_calls = self._keyrock_client.authorize_organization_role.call_args_list
+        self.assertEqual([
+            call('org_id', self._bae_app, self._bae_seller, 'owner'),
+            call('org_id', self._bae_app, self._bae_customer, 'owner'),
+            call('org_id', self._bae_app, self._bae_admin, 'owner')
+        ], authorize_calls)
+
+        policy = [{
+            "http_method": 'get',
+            "regex": "^/",
+            "settings": {
+                "required_headers": [{
+                    "key": "Fiware-Service",
+                    "value": 'tenant'
+                }],
+                "required_roles": [
+                    'tenant.' + self._consumer_role
+                ],
+                "required_roles_override": True
+            }
+        }, {
+            "http_method": 'any',
+            "regex": "^/",
+            "settings": {
+                "required_headers": [{
+                    "key": "Fiware-Service",
+                    "value": 'tenant'
+                }],
+                "required_roles": [
+                    'tenant.' + self._admin_role
+                ],
+                "required_roles_override": True
+            }
+        }]
+
+        self._umbrella_client.add_sub_url_setting_app_id.assert_called_once_with(
+            self._broker_app, policy
+        )
+
+        self._database_controller.save_tenant.assert_called_once_with(
+            'tenant', 'tenant description', 'user-id', 'org_id')
+
+    def test_get_tenants(self):
+        pass
 
 
 if __name__ == "__main__":
