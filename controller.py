@@ -98,7 +98,7 @@ def _create_access_policies(user_info):
 
 
 def _build_response(body, status):
-    resp = make_response(json.dumps(body), status)
+    resp = make_response(body, status)
     resp.headers['Content-Type'] = 'application/json'
     return resp
 

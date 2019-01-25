@@ -346,7 +346,26 @@ class ControllerTestCase(unittest.TestCase):
             'tenant', 'tenant description', 'user-id', 'org_id')
 
     def test_get_tenants(self):
-        pass
+        exp_tenants = []
+
+        self._database_controller.read_tenants.return_value = exp_tenants
+        self._response.headers = {}
+
+        controller.request.headers = {
+            'authorization': 'Bearer access-token'
+        }
+
+        tenants_response = controller.get()
+
+        self.assertEqual(tenants_response, self._response)
+        self.assertEqual({
+            'Content-Type': 'application/json'
+        }, self._response.headers)
+
+        controller.make_response.assert_called_once_with('[]', 200)
+
+        self._keyrock_client.authorize.assert_called_once_with('access-token')
+        self._database_controller.read_tenants.assert_called_once_with('user-id')
 
 
 if __name__ == "__main__":
