@@ -1,6 +1,7 @@
 # Opplafy Tenant Manager
 
-[![Build Status](https://travis-ci.org/opplafy/tenant-manager.svg?branch=master)](https://travis-ci.org/opplafy/tenant-manager) [![Coverage Status](https://coveralls.io/repos/github/opplafy/tenant-manager/badge.svg?branch=master&kill_cache=1)](https://coveralls.io/github/opplafy/tenant-manager?branch=master)
+[![Build Status](https://travis-ci.org/opplafy/tenant-manager.svg?branch=master)](https://travis-ci.org/opplafy/tenant-manager)
+[![Coverage Status](https://coveralls.io/repos/github/opplafy/tenant-manager/badge.svg?branch=master&kill_cache=1)](https://coveralls.io/github/opplafy/tenant-manager?branch=master)
 
 This repository includes the [Opplafy](https://www.opplafy.eu/en/) 
 Tenant Manager software. This service is intended to simplify the creation and 
@@ -9,10 +10,19 @@ the Context Broker.
 
 This service exposes an API able to orchestrate the different FIWARE
 components, creating a tenant organization in Keyrock and Context 
-Broker Fiware-Service read and write policies in API Umbrella.
+Broker FIWARE-Service read and write policies in API Umbrella.
 
 In addition, this service configures Business API Ecosystem permissions
 in order to support the monetization of NGSI data.
+
+## How to run it
+
+```
+docker run -d --name opplafy_tenant_manager -p 5000:5000 opplafy/tenant-manager
+```
+
+
+## API documentation
 
 The Tenant manager exposes a HTTP API with the following endpoints:
 
@@ -55,4 +65,4 @@ organization roles
                 "name": "username",
                 "roles": ["data-provider"]
             }]
-        }] 
+        }]
