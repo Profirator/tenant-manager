@@ -27,9 +27,9 @@ from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
 from lib.utils import build_response, authorized
-from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, \
+from settings import IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID, \
      BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
-     BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_HOST, UMBRELLA_TOKEN, UMBRELLA_KEY
+     BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY
 
 
 app = Flask(__name__)
@@ -63,13 +63,13 @@ def _create_access_policies(user_info):
     admin_policy = _build_policy('any', tenant, admin_role)
 
     # Add new policies to existing API sub settings
-    umbrella_client = UmbrellaClient(UMBRELLA_HOST, UMBRELLA_TOKEN, UMBRELLA_KEY)
+    umbrella_client = UmbrellaClient(UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY)
     umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
 
 
 def _organization_based_tenant(user_info):
     # This method seems not be usable due to the new Keyrock v7 implementation
-    keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+    keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
     org_id = keyrock_client.create_organization(
         request.json.get('name'), request.json.get('description'), user_info['id'])
 
@@ -155,7 +155,7 @@ def get(user_info):
         response_data = database_controller.read_tenants(user_info['id'])
 
         # Load tenant memebers from the IDM
-        keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
         for tenant in response_data:
             members = keyrock_client.get_organization_members(tenant['tenant_organization'])
             tenant['users'] = [{
@@ -191,7 +191,7 @@ def get_tenant(user_info, tenant_id):
             }, 403)
 
         # Load tenant memebers from the IDM
-        keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
         members = keyrock_client.get_organization_members(tenant_info['tenant_organization'])
         tenant_info['users'] = [{
             'id': member['user_id'],

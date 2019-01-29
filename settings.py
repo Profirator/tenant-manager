@@ -18,40 +18,33 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import json
+
 
 VERIFY_REQUESTS = True
 
-IDM_HOST = 'http://idm.docker:3000'
-IDM_USER = 'fdelavega@conwet.com'
-IDM_PASSWD = '123456789'
-
-BROKER_APP_ID = ''
-BROKER_ADMIN_ROLE = 'data-provider'
-BROKER_CONSUMER_ROLE = 'data-consumer'
-
-BAE_APP_ID = ''
-BAE_SELLER_ROLE = 'seller'
-BAE_CUSTOMER_ROLE = 'customer'
-BAE_ADMIN_ROLE = 'orgAdmin'
-
-UMBRELLA_HOST = ''
-UMBRELLA_TOKEN = ''
-UMBRELLA_KEY = ''
-
 # Configure using env variables
-IDM_HOST = os.environ.get('IDM_HOST', IDM_HOST)
-IDM_USER = os.environ.get('IDM_USER', IDM_USER)
-IDM_PASSWD = os.environ.get('IDM_PASSWD', IDM_PASSWD)
+IDM_URL = os.environ.get('IDM_URL', 'http://keyrock:3000')
+UMBRELLA_URL = os.environ.get('UMBRELLA_URL', 'http://umbrella')
 
-UMBRELLA_HOST = os.environ.get('UMBRELLA_HOST', UMBRELLA_HOST)
-UMBRELLA_TOKEN = os.environ.get('UMBRELLA_TOKEN', UMBRELLA_TOKEN)
-UMBRELLA_KEY = os.environ.get('UMBRELLA_KEY', UMBRELLA_KEY)
+BROKER_ADMIN_ROLE = os.environ.get('BROKER_ADMIN_ROLE', 'data-provider')
+BROKER_CONSUMER_ROLE = os.environ.get('BROKER_CONSUMER_ROLE', 'data-consumer')
 
-BROKER_APP_ID = os.environ.get('BROKER_APP_ID', BROKER_APP_ID)
-BROKER_ADMIN_ROLE = os.environ.get('BROKER_ADMIN_ROLE', BROKER_ADMIN_ROLE)
-BROKER_CONSUMER_ROLE = os.environ.get('BROKER_CONSUMER_ROLE', BROKER_CONSUMER_ROLE)
+BAE_SELLER_ROLE =  os.environ.get('BAE_SELLER_ROLE', 'seller')
+BAE_CUSTOMER_ROLE =  os.environ.get('BAE_CUSTOMER_ROLE', 'customer')
+BAE_ADMIN_ROLE =  os.environ.get('BAE_ADMIN_ROLE', 'orgAdmin')
 
-BAE_APP_ID =  os.environ.get('BAE_APP_ID', BAE_APP_ID)
-BAE_SELLER_ROLE =  os.environ.get('BAE_SELLER_ROLE', BAE_SELLER_ROLE)
-BAE_CUSTOMER_ROLE =  os.environ.get('BAE_CUSTOMER_ROLE', BAE_CUSTOMER_ROLE)
-BAE_ADMIN_ROLE =  os.environ.get('BAE_ADMIN_ROLE', BAE_ADMIN_ROLE)
+BROKER_ROLES = [BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE]
+BAE_ROLES = [BAE_SELLER_ROLE, BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE]
+
+
+secrets_file = "/run/secrets/{}".format(os.environ.get("CREDENTIALS_FILE", "credentials"))
+if os.path.isfile(secrets_file):
+    with open(secrets_file, "r") as f:
+        data = json.load(f)
+        BAE_APP_ID = data.get('bae', {}).get('client_id')
+        BROKER_APP_ID = data.get('broker', {}).get('client_id')
+        IDM_USER = data.get('idm', {}).get('user')
+        IDM_PASSWD = data.get('idm', {}).get('password')
+        UMBRELLA_TOKEN = data.get('umbrella', {}).get('token')
+        UMBRELLA_KEY = data.get('umbrella', {}).get('key')
