@@ -184,28 +184,34 @@ class KeyrockClient():
 
         return organization_id
 
-    def get_role_id(self, app_id, role):
-        """
-        Returns the ID of a role given its name and the application it belongs
-        """
-        url = urljoin(self._host, '/v1/applications/{}/roles'.format(app_id))
-
+    def _search_id(self, url, name, search_elem, key):
         response = requests.get(url, headers={
             'X-Auth-Token': self._access_token
         }, verify=VERIFY_REQUESTS)
 
         if response.status_code != 200:
-            raise KeyrockError('Role {} cannot be found'.format(role))
+            raise KeyrockError('{} {} cannot be found'.format(search_elem, user_name))
 
-        role_id = None
-        for role_info in response.json()['roles']:
-            if role_info['name'].lower() == role.lower():
-                role_id = role_info['id']
+        id_ = None
+        for elem in response.json()[search_elem.lower() + 's']:
+            if elem[key] == name:
+                id_ = elem['id']
                 break
         else:
-            raise KeyrockError('Role {} cannot be found'.format(role))
+            raise KeyrockError('{} {} cannot be found'.format(search_elem, user_name))
 
-        return role_id
+        return id_
+
+    def get_user_id(self, user_name):
+        url = urljoin(self._host, '/v1/users')
+        return self._search_id(url, user_name, 'User', 'username')
+
+    def get_role_id(self, app_id, role):
+        """
+        Returns the ID of a role given its name and the application it belongs
+        """
+        url = urljoin(self._host, '/v1/applications/{}/roles'.format(app_id))
+        return self._search_id(url, role, 'Role', 'name')
 
     def authorize_organization_role(self, organization_id, app_id, app_role, org_role):
         role_id = self.get_role_id(app_id, app_role)

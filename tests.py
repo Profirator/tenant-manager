@@ -343,7 +343,7 @@ class ControllerTestCase(unittest.TestCase):
         )
 
         self._database_controller.save_tenant.assert_called_once_with(
-            'tenant', 'tenant description', 'user-id', 'org_id')
+            'tenant', 'tenant description', 'user-id', 'org_id', [])
 
     def test_get_tenants(self):
         exp_tenants = []

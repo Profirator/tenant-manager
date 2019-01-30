@@ -25,7 +25,11 @@ The Tenant manager exposes a HTTP API with the following endpoints:
     BODY
         {
             "name": "tenant-name",
-            "description": "tenant description"
+            "description": "tenant description",
+            "users": [{
+                "name": "username",
+                "roles": ["data-provider"]
+            }]
         }
 
 As a result of this request a new tenant is created, including a new organization in Keyrock IDM
@@ -45,5 +49,10 @@ organization roles
             "owner_id": owner,
             "tenant_organization": "org-id",
             "name": "tenant-name",
-            "description": "tenant description"
+            "description": "tenant description",
+            "users": [{
+                "id": "user-id",
+                "name": "username",
+                "roles": ["data-provider"]
+            }]
         }] 

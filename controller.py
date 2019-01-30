@@ -34,37 +34,6 @@ from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES
 app = Flask(__name__)
 
 
-def _organization_based_tenant(keyrock_client, user_info):
-    # This method seems not be usable due to the new Keyrock v7 implementation    
-    org_id = keyrock_client.create_organization(
-        request.json.get('name'), request.json.get('description'), user_info['id'])
-
-    # Add context broker role
-    keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE)
-
-    # Add BAE roles
-    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_SELLER_ROLE, 'owner')
-    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_CUSTOMER_ROLE, 'owner')
-    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
-
-    return org_id
-
-def _app_based_tenant(keyrock_client, user_info):
-    broker_app = keyrock_client.get_application(BROKER_APP_ID)
-
-    # Create new application for the broker tenant
-    app_id = keyrock_client.create_application(
-        request.json.get('name'), request.json.get('description'),
-        broker_app['application']['url'], broker_app['application']['redirect_uri'])
-
-    # Create broker roles
-    for role in BROKER_ROLES:
-        keyrock_client.create_role(app_id, role)
-
-    # Grant provider role to tenant owner
-    keyrock_client.grant_application_role(app_id, user_info['id'], 'provider')
-
-
 def _build_policy(method, tenant, role):
     return {
         "http_method": method,
@@ -97,6 +66,64 @@ def _create_access_policies(user_info):
     umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
 
 
+def _organization_based_tenant(keyrock_client, user_info):
+    # This method seems not be usable due to the new Keyrock v7 implementation    
+    org_id = keyrock_client.create_organization(
+        request.json.get('name'), request.json.get('description'), user_info['id'])
+
+    # Add context broker role
+    keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE)
+
+    # Add BAE roles
+    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_SELLER_ROLE, 'owner')
+    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_CUSTOMER_ROLE, 'owner')
+    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
+
+    # Add tenant users if provided
+    users = []
+    if 'users' in request.json:
+        for user in request.json.get('users'):
+            # User name is not used to identify in Keyrock
+            user_id = keyrock_client.get_user_id(user['name'])
+
+            roles = []
+            if BROKER_ADMIN_ROLE in user['roles']:
+                keyrock_client.grant_organization_role(org_id, user_id, 'owner')
+                roles.append(BROKER_ADMIN_ROLE)
+
+            if BROKER_CONSUMER_ROLE in user['roles']:
+                keyrock_client.grant_organization_role(org_id, user_id, 'member')
+                roles.append(BROKER_CONSUMER_ROLE)
+
+            users.append({
+                'id': user_id,
+                'name': user['name'],
+                'roles': roles
+            })
+
+    _create_access_policies(user_info)
+
+    database_controller = DatabaseController()
+    database_controller.save_tenant(
+        request.json.get('name'), request.json.get('description'), user_info['id'], org_id, users)
+
+
+def _app_based_tenant(keyrock_client, user_info):
+    broker_app = keyrock_client.get_application(BROKER_APP_ID)
+
+    # Create new application for the broker tenant
+    app_id = keyrock_client.create_application(
+        request.json.get('name'), request.json.get('description'),
+        broker_app['application']['url'], broker_app['application']['redirect_uri'])
+
+    # Create broker roles
+    for role in BROKER_ROLES:
+        keyrock_client.create_role(app_id, role)
+
+    # Grant provider role to tenant owner
+    keyrock_client.grant_application_role(app_id, user_info['id'], 'provider')
+
+
 def _build_response(body, status):
     resp = make_response(body, status)
     resp.headers['Content-Type'] = 'application/json'
@@ -115,6 +142,13 @@ def create():
         return _build_response(json.dumps({
             'error': 'Missing required field description'
         }), 422)
+
+    if 'users' in request.json:
+        for user in request.json.get('users'):
+            if 'name' not in user or 'roles' not in user:
+                return _build_response(json.dumps({
+                    'error': 'Missing required field in user specification'
+                }), 422)
 
     if 'authorization' not in request.headers or \
             not request.headers.get('authorization').lower().startswith('bearer '):
@@ -137,12 +171,7 @@ def create():
 
     try:
         #_app_based_tenant(keyrock_client, user_info)
-        org_id = _organization_based_tenant(keyrock_client, user_info)
-        _create_access_policies(user_info)
-
-        database_controller = DatabaseController()
-        database_controller.save_tenant(
-            request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
+        _organization_based_tenant(keyrock_client, user_info)
 
     except (KeyrockError, UmbrellaError) as e:
         return _build_response(json.dumps({

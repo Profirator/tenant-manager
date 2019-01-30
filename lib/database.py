@@ -27,12 +27,13 @@ class DatabaseController:
     def __init__(self, host='localhost', port=27017):
         self._db = MongoClient(host, port).tenant_manager
 
-    def save_tenant(self, name, description, owner, org_id):
+    def save_tenant(self, name, description, owner, org_id, users):
         tenant_document = {
             'owner_id': owner,
             'tenant_organization': org_id,
             'name': name,
-            'description': description
+            'description': description,
+            'users': users
         }
 
         self._db.tenants.insert_one(tenant_document)
