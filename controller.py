@@ -27,8 +27,8 @@ from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
 from lib.utils import build_response, authorized
-from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
-     BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
+from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, \
+     BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
      BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_HOST, UMBRELLA_TOKEN, UMBRELLA_KEY
 
 
@@ -101,22 +101,6 @@ def _organization_based_tenant(user_info):
         request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
 
 
-def _app_based_tenant(keyrock_client, user_info):
-    broker_app = keyrock_client.get_application(BROKER_APP_ID)
-
-    # Create new application for the broker tenant
-    app_id = keyrock_client.create_application(
-        request.json.get('name'), request.json.get('description'),
-        broker_app['application']['url'], broker_app['application']['redirect_uri'])
-
-    # Create broker roles
-    for role in BROKER_ROLES:
-        keyrock_client.create_role(app_id, role)
-
-    # Grant provider role to tenant owner
-    keyrock_client.grant_application_role(app_id, user_info['id'], 'provider')
-
-
 def _map_roles(member):
     roles = [BROKER_CONSUMER_ROLE]
 
@@ -148,7 +132,6 @@ def create(user_info):
                 }, 422)
 
     try:
-        #_app_based_tenant(keyrock_client, user_info)
         _organization_based_tenant(user_info)
 
     except (KeyrockError, UmbrellaError) as e:
@@ -204,7 +187,7 @@ def get_tenant(user_info, tenant_id):
 
         if tenant_info['user_id'] != user_info['id']:
             return build_response({
-                'error': 'You are not authroized to retrieve tenant info'
+                'error': 'You are not authorized to retrieve tenant info'
             }, 403)
 
         # Load tenant memebers from the IDM

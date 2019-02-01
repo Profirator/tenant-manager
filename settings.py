@@ -29,20 +29,29 @@ BROKER_APP_ID = ''
 BROKER_ADMIN_ROLE = 'data-provider'
 BROKER_CONSUMER_ROLE = 'data-consumer'
 
-BROKER_ROLES = ['data-provider', 'data-consumer']
-
 BAE_APP_ID = ''
 BAE_SELLER_ROLE = 'seller'
 BAE_CUSTOMER_ROLE = 'customer'
 BAE_ADMIN_ROLE = 'orgAdmin'
-
-BAE_ROLES = ['seller', 'customer', 'orgAdmin']
 
 UMBRELLA_HOST = ''
 UMBRELLA_TOKEN = ''
 UMBRELLA_KEY = ''
 
 # Configure using env variables
-IDM_HOST = os.environ.get('TENANT_IDM_HOST', IDM_HOST)
-IDM_USER = os.environ.get('TENANT_IDM_USER', IDM_USER)
-IDM_PASSWD = os.environ.get('TENANT_IDM_PASSWD', IDM_PASSWD)
+IDM_HOST = os.environ.get('IDM_HOST', IDM_HOST)
+IDM_USER = os.environ.get('IDM_USER', IDM_USER)
+IDM_PASSWD = os.environ.get('IDM_PASSWD', IDM_PASSWD)
+
+UMBRELLA_HOST = os.environ.get('UMBRELLA_HOST', UMBRELLA_HOST)
+UMBRELLA_TOKEN = os.environ.get('UMBRELLA_TOKEN', UMBRELLA_TOKEN)
+UMBRELLA_KEY = os.environ.get('UMBRELLA_KEY', UMBRELLA_KEY)
+
+BROKER_APP_ID = os.environ.get('BROKER_APP_ID', BROKER_APP_ID)
+BROKER_ADMIN_ROLE = os.environ.get('BROKER_ADMIN_ROLE', BROKER_ADMIN_ROLE)
+BROKER_CONSUMER_ROLE = os.environ.get('BROKER_CONSUMER_ROLE', BROKER_CONSUMER_ROLE)
+
+BAE_APP_ID =  os.environ.get('BAE_APP_ID', BAE_APP_ID)
+BAE_SELLER_ROLE =  os.environ.get('BAE_SELLER_ROLE', BAE_SELLER_ROLE)
+BAE_CUSTOMER_ROLE =  os.environ.get('BAE_CUSTOMER_ROLE', BAE_CUSTOMER_ROLE)
+BAE_ADMIN_ROLE =  os.environ.get('BAE_ADMIN_ROLE', BAE_ADMIN_ROLE)
