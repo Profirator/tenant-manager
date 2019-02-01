@@ -242,3 +242,37 @@ class KeyrockClient():
 
         self.authorize_organization_role(organization_id, app_id, admin_role, 'owner')
         self.authorize_organization_role(organization_id, app_id, member_role, 'member')
+
+    def get_user(self, user_id):
+        """
+        Returns detailed info of a given user
+        """
+        url = urljoin(self._host, '/v1/users/{}'.format(user_id))
+
+        response = requests.get(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 200:
+            raise KeyrockError('It could not be possible to retrieve user info')
+
+        return response.json()['user']
+
+    def get_organization_members(self, organization_id):
+        """
+        Returns the list of users that are members of a given organization
+        """
+        url = urljoin(self._host, '/v1/organizations/{}/users'.format(organization_id))
+
+        response = requests.get(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 200:
+            raise KeyrockError('It could not be possible to retrieve organization members')
+
+        members = response.json()['organization_users']
+        for member in members:
+            member['name'] = self.get_user(member['id'])['username']
+
+        return members

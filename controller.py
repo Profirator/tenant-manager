@@ -80,32 +80,23 @@ def _organization_based_tenant(keyrock_client, user_info):
     keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
 
     # Add tenant users if provided
-    users = []
     if 'users' in request.json:
         for user in request.json.get('users'):
             # User name is not used to identify in Keyrock
             user_id = keyrock_client.get_user_id(user['name'])
 
-            roles = []
+            # Keyrock IDM only supports a single organization role
+            if BROKER_CONSUMER_ROLE in user['roles'] and not BROKER_ADMIN_ROLE in user['roles']:
+                keyrock_client.grant_organization_role(org_id, user_id, 'member')
+
             if BROKER_ADMIN_ROLE in user['roles']:
                 keyrock_client.grant_organization_role(org_id, user_id, 'owner')
-                roles.append(BROKER_ADMIN_ROLE)
-
-            if BROKER_CONSUMER_ROLE in user['roles']:
-                keyrock_client.grant_organization_role(org_id, user_id, 'member')
-                roles.append(BROKER_CONSUMER_ROLE)
-
-            users.append({
-                'id': user_id,
-                'name': user['name'],
-                'roles': roles
-            })
 
     _create_access_policies(user_info)
 
     database_controller = DatabaseController()
     database_controller.save_tenant(
-        request.json.get('name'), request.json.get('description'), user_info['id'], org_id, users)
+        request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
 
 
 def _app_based_tenant(keyrock_client, user_info):
@@ -128,6 +119,13 @@ def _build_response(body, status):
     resp = make_response(body, status)
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
+
+def _map_roles(member):
+    roles = [BROKER_CONSUMER_ROLE]
+
+    if member['role'] == 'owner':
+        roles.append(BROKER_ADMIN_ROLE)
 
 
 @app.route("/tenant", methods=['POST'])
@@ -210,6 +208,16 @@ def get():
     try:
         database_controller = DatabaseController()
         response_data = database_controller.read_tenants(user_info['id'])
+
+        # Load tenant memebers from the IDM
+        for tenant in response_data:
+            members = keyrock_client.get_organization_members(tenant['tenant_organization'])
+            tenant['users'] = [{
+                'id': member['user_id'],
+                'name': member['name'],
+                'roles': map_roles(member)
+            } for member in members]
+
     except:
         return _build_response(json.dumps({
             'error': 'An error occurred reading tenants'
