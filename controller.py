@@ -123,6 +123,8 @@ def _map_roles(member):
     if member['role'] == 'owner':
         roles.append(BROKER_ADMIN_ROLE)
 
+    return roles
+
 
 @app.route("/tenant", methods=['POST'])
 @authorized
@@ -190,6 +192,7 @@ def get(user_info):
 @app.route("/tenant/<tenant_id>", methods=['GET'])
 @authorized
 def get_tenant(user_info, tenant_id):
+    tenant_info = None
     try:
         database_controller = DatabaseController()
         tenant_info = database_controller.get_tenant(tenant_id)
@@ -210,7 +213,7 @@ def get_tenant(user_info, tenant_id):
         tenant_info['users'] = [{
             'id': member['user_id'],
             'name': member['name'],
-            'roles': map_roles(member)
+            'roles': _map_roles(member)
         } for member in members]
 
     except:
@@ -218,7 +221,7 @@ def get_tenant(user_info, tenant_id):
             'error': 'An error occurred reading tenants'
         }, 500)
 
-    return build_response(response_data, 200)
+    return build_response(tenant_info, 200)
 
 
 if __name__ == '__main__':

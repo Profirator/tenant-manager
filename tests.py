@@ -436,7 +436,7 @@ class ControllerTestCase(unittest.TestCase):
             'users': [{
                 'id': 'user-id',
                 'name': 'username',
-                'roles': [self._admin_role, self._consumer_role]
+                'roles': [self._consumer_role, self._admin_role]
             }]
         }]
 
@@ -450,7 +450,7 @@ class ControllerTestCase(unittest.TestCase):
             'role': 'owner'
         }]
 
-        self._database_controller.read_tenants.return_value = exp_tenants
+        self._database_controller.read_tenants.return_value = tenants
         self._keyrock_client.get_organization_members.return_value = members
 
         tenants_response = controller.get(self._user_info)
@@ -458,6 +458,41 @@ class ControllerTestCase(unittest.TestCase):
         self.assertEqual(tenants_response, self._response)
         controller.build_response.assert_called_once_with(exp_tenants, 200)
         self._database_controller.read_tenants.assert_called_once_with('user-id')
+
+    def test_get_tenant(self):
+        org_id = 'org_id'
+        tenant_id = 'tenant_id'
+
+        exp_tenant = {
+            'tenant_organization': org_id,
+            'user_id': 'user-id',
+            'users': [{
+                'id': 'user-id',
+                'name': 'username',
+                'roles': [self._consumer_role, self._admin_role]
+            }]
+        }
+
+        tenant = {
+            'tenant_organization': org_id,
+            'user_id': 'user-id'
+        }
+
+        members = [{
+            'user_id': 'user-id',
+            'name': 'username',
+            'role': 'owner'
+        }]
+
+        self._database_controller.get_tenant.return_value = tenant
+        self._keyrock_client.get_organization_members.return_value = members
+
+        #import ipdb; ipdb.set_trace()
+        tenant_response = controller.get_tenant(self._user_info, tenant_id)
+
+        self.assertEqual(tenant_response, self._response)
+        controller.build_response.assert_called_once_with(exp_tenant, 200)
+        self._database_controller.get_tenant.assert_called_once_with(tenant_id)
 
 
 if __name__ == "__main__":
