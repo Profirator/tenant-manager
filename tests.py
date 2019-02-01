@@ -243,6 +243,44 @@ class KeyrockClientTestCase(unittest.TestCase):
             call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/2/organization_roles/member', json=member_body, headers=self._headers, verify=VERIFY_REQUESTS)
         ], post_calls)
 
+    def test_get_organization_members(self):
+        org_id = 'org_id'
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        members = {
+            'organization_users': [{
+                'id': 'user_id'
+            }]
+        }
+        get_members_response = MagicMock(status_code=200)
+        get_members_response.json.return_value = members
+
+        user = {
+            'user': {
+                'username': 'username'
+            }
+        }
+        get_user_response = MagicMock(status_code=200)
+        get_user_response.json.return_value = user
+
+        keyrock_client.requests.post.return_value = login_response
+        keyrock_client.requests.get.side_effect = [get_members_response, get_user_response]
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        members_response = client.get_organization_members(org_id)
+
+        exp_response = [{
+            'id': 'user_id',
+            'name': 'username'
+        }]
+        self.assertEqual(exp_response, members_response)
+
+        get_calls = keyrock_client.requests.get.call_args_list
+        self.assertEqual([
+            call('http://idm.docker:3000/v1/organizations/org_id/users',headers=self._headers, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/users/user_id',headers=self._headers, verify=VERIFY_REQUESTS)
+        ], get_calls)
+
 
 class UmbrellaClientTestCase(unittest.TestCase):
 
@@ -487,7 +525,6 @@ class ControllerTestCase(unittest.TestCase):
         self._database_controller.get_tenant.return_value = tenant
         self._keyrock_client.get_organization_members.return_value = members
 
-        #import ipdb; ipdb.set_trace()
         tenant_response = controller.get_tenant(self._user_info, tenant_id)
 
         self.assertEqual(tenant_response, self._response)
