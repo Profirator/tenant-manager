@@ -19,10 +19,83 @@
 
 import unittest
 from unittest.mock import MagicMock, call
+from importlib import reload
 
 import controller
-from lib import keyrock_client, umbrella_client
+from lib import keyrock_client, umbrella_client, utils
 from settings import VERIFY_REQUESTS
+
+
+class UtilsTestCase(unittest.TestCase):
+
+    _user_info = {
+        'id': 'user-id'
+    }
+    _token = 'access-token'
+
+    def setUp(self):
+        self._keyrock_client = MagicMock()
+        self._keyrock_client.authorize.return_value = self._user_info
+
+        utils.KeyrockClient = MagicMock(return_value=self._keyrock_client)
+        self._response = MagicMock()
+
+        utils.make_response = MagicMock(return_value=self._response)
+        utils.request = MagicMock()
+
+    def test_authorization_decorator(self):
+        expected_response = {}
+        exp_id = '1'
+
+        def wrapped(user_info, id_param):
+            self.assertEqual(self._user_info, user_info)
+            self.assertEqual(exp_id, id_param)
+            return expected_response
+
+        utils.request.headers = {
+            'authorization': 'Bearer {}'.format(self._token)
+        }
+
+        # Validate decorator
+        wrapper = utils.authorized(wrapped)
+        resp = wrapper(exp_id)
+
+        self.assertEqual(expected_response, resp)
+        self._keyrock_client.authorize.assert_called_once_with(self._token)
+
+    def test_authorization_decorator_missing_token(self):
+        def wrapped(user_info):
+            pass
+
+        utils.request.headers = {}
+
+        # Validate decorator
+        wrapper = utils.authorized(wrapped)
+        resp = wrapper()
+
+        self.assertEqual(self._response, resp)
+        utils.make_response.assert_called_once_with('{"error": "This request requires authentication"}', 401)
+
+        self.assertEqual(0, self._keyrock_client.authorize.call_count)
+
+    def test_authorization_decorator_invalid_token(self):
+        def wrapped(user_info):
+            pass
+
+        self._keyrock_client.authorize.side_effect = Exception('Error')
+
+        utils.request.headers = {
+            'authorization': 'Bearer {}'.format(self._token)
+        }
+
+        # Validate decorator
+        wrapper = utils.authorized(wrapped)
+        resp = wrapper()
+
+        self.assertEqual(self._response, resp)
+        utils.make_response.assert_called_once_with('{"error": "This request requires authentication"}', 401)
+
+        self._keyrock_client.authorize.assert_called_once_with(self._token)
 
 
 class KeyrockClientTestCase(unittest.TestCase):
@@ -248,8 +321,21 @@ class ControllerTestCase(unittest.TestCase):
     _bae_seller = 'seller'
     _bae_customer = 'customer'
     _bae_admin = 'admin'
+    _user_info = {
+        'id': 'user-id'
+    }
 
     def setUp(self):
+        def mock_decorator(func):
+            def  wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+
+            wrapper.__name__ = func.__name__
+            return wrapper
+
+        utils.authorized = mock_decorator
+        reload(controller)
+
         # Mock controller dependencies
         controller.request = MagicMock()
 
@@ -257,9 +343,6 @@ class ControllerTestCase(unittest.TestCase):
         controller.make_response = MagicMock(return_value=self._response)
 
         self._keyrock_client = MagicMock()
-        self._keyrock_client.authorize.return_value = {
-            'id': 'user-id'
-        }
 
         controller.KeyrockClient = MagicMock(return_value=self._keyrock_client)
 
@@ -269,6 +352,8 @@ class ControllerTestCase(unittest.TestCase):
         self._database_controller = MagicMock()
         controller.DatabaseController = MagicMock(return_value=self._database_controller)
 
+        controller.build_response = MagicMock(return_value=self._response)
+
         controller.BROKER_APP_ID = self._broker_app
         controller.BROKER_ADMIN_ROLE = self._admin_role
         controller.BROKER_CONSUMER_ROLE = self._consumer_role
@@ -277,6 +362,9 @@ class ControllerTestCase(unittest.TestCase):
         controller.BAE_CUSTOMER_ROLE = self._bae_customer
         controller.BAE_ADMIN_ROLE = self._bae_admin
 
+    def tearDown(self):
+        reload(utils)
+
     def test_create_tenant(self):
         # Mock request contents
         controller.request.json = {
@@ -284,19 +372,14 @@ class ControllerTestCase(unittest.TestCase):
             'description': 'tenant description'
         }
 
-        controller.request.headers = {
-            'authorization': 'Bearer access-token'
-        }
-
         self._keyrock_client.create_organization.return_value = 'org_id'
 
-        response = controller.create()
+        response = controller.create(self._user_info)
 
         # Validate calls
         self.assertEqual(self._response, response)
         controller.make_response.assert_called_once_with('', 201)
 
-        self._keyrock_client.authorize.assert_called_once_with('access-token')
         self._keyrock_client.create_organization.assert_called_once_with('tenant', 'tenant description', 'user-id')
 
         self._keyrock_client.authorize_organization.assert_called_once_with(
@@ -346,25 +429,34 @@ class ControllerTestCase(unittest.TestCase):
             'tenant', 'tenant description', 'user-id', 'org_id')
 
     def test_get_tenants(self):
-        exp_tenants = []
+        org_id = 'org_id'
+
+        exp_tenants = [{
+            'tenant_organization': org_id,
+            'users': [{
+                'id': 'user-id',
+                'name': 'username',
+                'roles': [self._admin_role, self._consumer_role]
+            }]
+        }]
+
+        tenants = [{
+            'tenant_organization': org_id
+        }]
+
+        members = [{
+            'user_id': 'user-id',
+            'name': 'username',
+            'role': 'owner'
+        }]
 
         self._database_controller.read_tenants.return_value = exp_tenants
-        self._response.headers = {}
+        self._keyrock_client.get_organization_members.return_value = members
 
-        controller.request.headers = {
-            'authorization': 'Bearer access-token'
-        }
-
-        tenants_response = controller.get()
+        tenants_response = controller.get(self._user_info)
 
         self.assertEqual(tenants_response, self._response)
-        self.assertEqual({
-            'Content-Type': 'application/json'
-        }, self._response.headers)
-
-        controller.make_response.assert_called_once_with('[]', 200)
-
-        self._keyrock_client.authorize.assert_called_once_with('access-token')
+        controller.build_response.assert_called_once_with(exp_tenants, 200)
         self._database_controller.read_tenants.assert_called_once_with('user-id')
 
 

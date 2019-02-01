@@ -26,6 +26,7 @@ from flask import Flask, request, make_response
 from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
+from lib.utils import build_response, authorized
 from settings import IDM_HOST, IDM_PASSWD, IDM_USER, BROKER_APP_ID, BROKER_ROLES, \
      BAE_APP_ID, BAE_ROLES, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
      BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_HOST, UMBRELLA_TOKEN, UMBRELLA_KEY
@@ -66,8 +67,9 @@ def _create_access_policies(user_info):
     umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
 
 
-def _organization_based_tenant(keyrock_client, user_info):
-    # This method seems not be usable due to the new Keyrock v7 implementation    
+def _organization_based_tenant(user_info):
+    # This method seems not be usable due to the new Keyrock v7 implementation
+    keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
     org_id = keyrock_client.create_organization(
         request.json.get('name'), request.json.get('description'), user_info['id'])
 
@@ -115,12 +117,6 @@ def _app_based_tenant(keyrock_client, user_info):
     keyrock_client.grant_application_role(app_id, user_info['id'], 'provider')
 
 
-def _build_response(body, status):
-    resp = make_response(body, status)
-    resp.headers['Content-Type'] = 'application/json'
-    return resp
-
-
 def _map_roles(member):
     roles = [BROKER_CONSUMER_ROLE]
 
@@ -129,101 +125,100 @@ def _map_roles(member):
 
 
 @app.route("/tenant", methods=['POST'])
-def create():
+@authorized
+def create(user_info):
     # Get tenant info for JSON request
     if 'name' not in request.json:
-        return _build_response(json.dumps({
+        return build_response({
             'error': 'Missing required field name'
-        }), 422)
+        }, 422)
 
     if 'description' not in request.json:
-        return _build_response(json.dumps({
+        return build_response({
             'error': 'Missing required field description'
-        }), 422)
+        }, 422)
 
     if 'users' in request.json:
         for user in request.json.get('users'):
             if 'name' not in user or 'roles' not in user:
-                return _build_response(json.dumps({
+                return build_response({
                     'error': 'Missing required field in user specification'
-                }), 422)
-
-    if 'authorization' not in request.headers or \
-            not request.headers.get('authorization').lower().startswith('bearer '):
-
-        return _build_response(json.dumps({
-            'error': 'This request requires authentication'
-        }), 401)
-
-    keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
-
-    # Authorize user making the request
-    token = request.headers.get('authorization').split(' ')[1]
-
-    try:
-        user_info = keyrock_client.authorize(token)
-    except:
-        return _build_response(json.dumps({
-            'error': 'This request requires authentication'
-        }), 401)
+                }, 422)
 
     try:
         #_app_based_tenant(keyrock_client, user_info)
-        _organization_based_tenant(keyrock_client, user_info)
+        _organization_based_tenant(user_info)
 
     except (KeyrockError, UmbrellaError) as e:
-        return _build_response(json.dumps({
+        return build_response({
             'error': str(e)
-        }), 400)
+        }, 400)
     except Exception:
-        return _build_response(json.dumps({
+        return build_response({
             'error': 'Unexpected error creating tenant'
-        }), 500)
+        }, 500)
 
     return make_response('', 201)
 
 
 @app.route("/tenant", methods=['GET'])
-def get():
-    if 'authorization' not in request.headers or \
-            not request.headers.get('authorization').lower().startswith('bearer '):
-
-        return _build_response(json.dumps({
-            'error': 'This request requires authentication'
-        }), 401)
-
-    keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
-
-    # Authorize user making the request
-    token = request.headers.get('authorization').split(' ')[1]
-
-    try:
-        user_info = keyrock_client.authorize(token)
-    except:
-        return _build_response(json.dumps({
-            'error': 'This request requires authentication'
-        }), 401)
-
+@authorized
+def get(user_info):
     response_data = []
     try:
         database_controller = DatabaseController()
         response_data = database_controller.read_tenants(user_info['id'])
 
         # Load tenant memebers from the IDM
+        keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
         for tenant in response_data:
             members = keyrock_client.get_organization_members(tenant['tenant_organization'])
             tenant['users'] = [{
                 'id': member['user_id'],
                 'name': member['name'],
-                'roles': map_roles(member)
+                'roles': _map_roles(member)
             } for member in members]
 
     except:
-        return _build_response(json.dumps({
+        return build_response({
             'error': 'An error occurred reading tenants'
-        }), 500)
+        }, 500)
 
-    return _build_response(json.dumps(response_data), 200)
+    return build_response(response_data, 200)
+
+
+@app.route("/tenant/<tenant_id>", methods=['GET'])
+@authorized
+def get_tenant(user_info, tenant_id):
+    try:
+        database_controller = DatabaseController()
+        tenant_info = database_controller.get_tenant(tenant_id)
+
+        if tenant_info is None:
+            return build_response({
+                'error': 'Tenant {} does not exist'.format(tenant_id)
+            }, 404)
+
+        if tenant_info['user_id'] != user_info['id']:
+            return build_response({
+                'error': 'You are not authroized to retrieve tenant info'
+            }, 403)
+
+        # Load tenant memebers from the IDM
+        keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+        members = keyrock_client.get_organization_members(tenant_info['tenant_organization'])
+        tenant_info['users'] = [{
+            'id': member['user_id'],
+            'name': member['name'],
+            'roles': map_roles(member)
+        } for member in members]
+
+    except:
+        return build_response({
+            'error': 'An error occurred reading tenants'
+        }, 500)
+
+    return build_response(response_data, 200)
 
 
 if __name__ == '__main__':

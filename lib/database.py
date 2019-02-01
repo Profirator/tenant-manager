@@ -19,6 +19,8 @@
 
 import pymongo
 
+from bson import ObjectId
+
 
 class DatabaseController:
 
@@ -42,5 +44,10 @@ class DatabaseController:
             t['_id'] = str(t['_id'])
 
         return [serialize_ids(tenant) for tenant in self._db.tenants.find({'owner_id': owner})]
+
+    def get_tenant(self, tenant_id):
+        return self._db.tenants.find_one({
+            '_id': ObjectId(tenant_id)
+        })
 
 
