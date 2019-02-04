@@ -29,8 +29,9 @@ class DatabaseController:
     def __init__(self, host='localhost', port=27017):
         self._db = MongoClient(host, port).tenant_manager
 
-    def save_tenant(self, name, description, owner, org_id):
+    def save_tenant(self, tenant_id, name, description, owner, org_id):
         tenant_document = {
+            'id': tenant_id,
             'owner_id': owner,
             'tenant_organization': org_id,
             'name': name,
@@ -41,13 +42,13 @@ class DatabaseController:
 
     def read_tenants(self, owner):
         def serialize_ids(t):
-            t['_id'] = str(t['_id'])
+            del t['_id']
 
         return [serialize_ids(tenant) for tenant in self._db.tenants.find({'owner_id': owner})]
 
     def get_tenant(self, tenant_id):
         return self._db.tenants.find_one({
-            '_id': ObjectId(tenant_id)
+            'id': tenant_id
         })
 
 

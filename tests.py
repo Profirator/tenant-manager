@@ -82,7 +82,7 @@ class UtilsTestCase(unittest.TestCase):
         def wrapped(user_info):
             pass
 
-        self._keyrock_client.authorize.side_effect = Exception('Error')
+        self._keyrock_client.authorize.side_effect = keyrock_client.KeyrockError('Error')
 
         utils.request.headers = {
             'authorization': 'Bearer {}'.format(self._token)
@@ -406,11 +406,12 @@ class ControllerTestCase(unittest.TestCase):
     def test_create_tenant(self):
         # Mock request contents
         controller.request.json = {
-            'name': 'tenant',
+            'name': 'New Tenant',
             'description': 'tenant description'
         }
 
         self._keyrock_client.create_organization.return_value = 'org_id'
+        self._database_controller.get_tenant.return_value = None
 
         response = controller.create(self._user_info)
 
@@ -418,7 +419,7 @@ class ControllerTestCase(unittest.TestCase):
         self.assertEqual(self._response, response)
         controller.make_response.assert_called_once_with('', 201)
 
-        self._keyrock_client.create_organization.assert_called_once_with('tenant', 'tenant description', 'user-id')
+        self._keyrock_client.create_organization.assert_called_once_with('New Tenant', 'tenant description', 'user-id')
 
         self._keyrock_client.authorize_organization.assert_called_once_with(
             'org_id', self._broker_app, self._admin_role, self._consumer_role
@@ -437,10 +438,10 @@ class ControllerTestCase(unittest.TestCase):
             "settings": {
                 "required_headers": [{
                     "key": "Fiware-Service",
-                    "value": 'tenant'
+                    "value": 'new-tenant'
                 }],
                 "required_roles": [
-                    'tenant.' + self._consumer_role
+                    'org_id.' + self._consumer_role
                 ],
                 "required_roles_override": True
             }
@@ -450,10 +451,10 @@ class ControllerTestCase(unittest.TestCase):
             "settings": {
                 "required_headers": [{
                     "key": "Fiware-Service",
-                    "value": 'tenant'
+                    "value": 'new-tenant'
                 }],
                 "required_roles": [
-                    'tenant.' + self._admin_role
+                    'org_id.' + self._admin_role
                 ],
                 "required_roles_override": True
             }
@@ -464,7 +465,7 @@ class ControllerTestCase(unittest.TestCase):
         )
 
         self._database_controller.save_tenant.assert_called_once_with(
-            'tenant', 'tenant description', 'user-id', 'org_id')
+            'new-tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
 
     def test_get_tenants(self):
         org_id = 'org_id'

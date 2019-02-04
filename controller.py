@@ -52,53 +52,17 @@ def _build_policy(method, tenant, role):
     }
 
 
-def _create_access_policies(user_info):
+def _create_access_policies(tenant, org_id, user_info):
     # Build read and admin policies
-    tenant = request.json.get('name')
-
-    read_role = tenant.lower().replace(' ', '-') + '.' + BROKER_CONSUMER_ROLE
+    read_role = org_id + '.' + BROKER_CONSUMER_ROLE
     read_policy = _build_policy('get', tenant, read_role)
 
-    admin_role = tenant.lower().replace(' ', '-') + '.' + BROKER_ADMIN_ROLE
+    admin_role = org_id + '.' + BROKER_ADMIN_ROLE
     admin_policy = _build_policy('any', tenant, admin_role)
 
     # Add new policies to existing API sub settings
     umbrella_client = UmbrellaClient(UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY)
     umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
-
-
-def _organization_based_tenant(user_info):
-    # This method seems not be usable due to the new Keyrock v7 implementation
-    keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
-    org_id = keyrock_client.create_organization(
-        request.json.get('name'), request.json.get('description'), user_info['id'])
-
-    # Add context broker role
-    keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE)
-
-    # Add BAE roles
-    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_SELLER_ROLE, 'owner')
-    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_CUSTOMER_ROLE, 'owner')
-    keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
-
-    # Add tenant users if provided
-    if 'users' in request.json:
-        for user in request.json.get('users'):
-            # User name is not used to identify in Keyrock
-            user_id = keyrock_client.get_user_id(user['name'])
-
-            # Keyrock IDM only supports a single organization role
-            if BROKER_CONSUMER_ROLE in user['roles'] and not BROKER_ADMIN_ROLE in user['roles']:
-                keyrock_client.grant_organization_role(org_id, user_id, 'member')
-
-            if BROKER_ADMIN_ROLE in user['roles']:
-                keyrock_client.grant_organization_role(org_id, user_id, 'owner')
-
-    _create_access_policies(user_info)
-
-    database_controller = DatabaseController()
-    database_controller.save_tenant(
-        request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
 
 
 def _map_roles(member):
@@ -132,7 +96,44 @@ def create(user_info):
                 }, 422)
 
     try:
-        _organization_based_tenant(user_info)
+        # Build tenant-id 
+        tenant_id = request.json.get('name').lower().replace(' ', '-')
+        database_controller = DatabaseController()
+        prev_t = database_controller.get_tenant(tenant_id)
+
+        if prev_t is not None:
+            return build_response({
+                'error': 'The tenant {} is already registered'.format(tenant_id)
+            }, 409)
+
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
+        org_id = keyrock_client.create_organization(
+            request.json.get('name'), request.json.get('description'), user_info['id'])
+
+        # Add context broker role
+        keyrock_client.authorize_organization(org_id, BROKER_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE)
+
+        # Add BAE roles
+        keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_SELLER_ROLE, 'owner')
+        keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_CUSTOMER_ROLE, 'owner')
+        keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
+
+        # Add tenant users if provided
+        if 'users' in request.json:
+            for user in request.json.get('users'):
+                # User name is not used to identify in Keyrock
+                user_id = keyrock_client.get_user_id(user['name'])
+
+                # Keyrock IDM only supports a single organization role
+                if BROKER_CONSUMER_ROLE in user['roles'] and not BROKER_ADMIN_ROLE in user['roles']:
+                    keyrock_client.grant_organization_role(org_id, user_id, 'member')
+
+                if BROKER_ADMIN_ROLE in user['roles']:
+                    keyrock_client.grant_organization_role(org_id, user_id, 'owner')
+
+        _create_access_policies(tenant_id, org_id, user_info)
+        database_controller.save_tenant(
+            tenant_id, request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
 
     except (KeyrockError, UmbrellaError) as e:
         return build_response({
