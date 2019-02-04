@@ -25,26 +25,30 @@ VERIFY_REQUESTS = True
 
 # Configure using env variables
 IDM_URL = os.environ.get('IDM_URL', 'http://keyrock:3000')
-UMBRELLA_URL = os.environ.get('UMBRELLA_URL', 'http://umbrella')
+IDM_USER = os.environ.get('IDM_USER', 'fdelavega@conwet.com')
+IDM_PASSWD = os.environ.get('IDM_PASSWD', '123456789')
 
+UMBRELLA_URL = os.environ.get('UMBRELLA_URL', 'http://umbrella')
+UMBRELLA_TOKEN = os.environ.get('UMBRELLA_TOKEN', '')
+UMBRELLA_KEY = os.environ.get('UMBRELLA_KEY', '')
+
+BROKER_APP_ID = os.environ.get('BROKER_APP_ID', '')
 BROKER_ADMIN_ROLE = os.environ.get('BROKER_ADMIN_ROLE', 'data-provider')
 BROKER_CONSUMER_ROLE = os.environ.get('BROKER_CONSUMER_ROLE', 'data-consumer')
 
+BAE_APP_ID = os.environ.get('BAE_APP_ID', '')
 BAE_SELLER_ROLE = os.environ.get('BAE_SELLER_ROLE', 'seller')
 BAE_CUSTOMER_ROLE = os.environ.get('BAE_CUSTOMER_ROLE', 'customer')
 BAE_ADMIN_ROLE = os.environ.get('BAE_ADMIN_ROLE', 'orgAdmin')
-
-BROKER_ROLES = [BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE]
-BAE_ROLES = [BAE_SELLER_ROLE, BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE]
 
 
 secrets_file = "/run/secrets/{}".format(os.environ.get("CREDENTIALS_FILE", "credentials.json"))
 if os.path.isfile(secrets_file):
     with open(secrets_file, "r") as f:
         data = json.load(f)
-        BAE_APP_ID = data.get('bae', {}).get('client_id')
-        BROKER_APP_ID = data.get('broker', {}).get('client_id')
-        IDM_USER = data.get('idm', {}).get('user')
-        IDM_PASSWD = data.get('idm', {}).get('password')
-        UMBRELLA_TOKEN = data.get('umbrella', {}).get('token')
-        UMBRELLA_KEY = data.get('umbrella', {}).get('key')
+        BAE_APP_ID = data.get('bae', {}).get('client_id', BAE_APP_ID)
+        BROKER_APP_ID = data.get('broker', {}).get('client_id', BROKER_APP_ID)
+        IDM_USER = data.get('idm', {}).get('user', IDM_USER)
+        IDM_PASSWD = data.get('idm', {}).get('password', IDM_PASSWD)
+        UMBRELLA_TOKEN = data.get('umbrella', {}).get('token', UMBRELLA_TOKEN)
+        UMBRELLA_KEY = data.get('umbrella', {}).get('key', UMBRELLA_KEY)
