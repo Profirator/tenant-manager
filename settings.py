@@ -30,15 +30,15 @@ UMBRELLA_URL = os.environ.get('UMBRELLA_URL', 'http://umbrella')
 BROKER_ADMIN_ROLE = os.environ.get('BROKER_ADMIN_ROLE', 'data-provider')
 BROKER_CONSUMER_ROLE = os.environ.get('BROKER_CONSUMER_ROLE', 'data-consumer')
 
-BAE_SELLER_ROLE =  os.environ.get('BAE_SELLER_ROLE', 'seller')
-BAE_CUSTOMER_ROLE =  os.environ.get('BAE_CUSTOMER_ROLE', 'customer')
-BAE_ADMIN_ROLE =  os.environ.get('BAE_ADMIN_ROLE', 'orgAdmin')
+BAE_SELLER_ROLE = os.environ.get('BAE_SELLER_ROLE', 'seller')
+BAE_CUSTOMER_ROLE = os.environ.get('BAE_CUSTOMER_ROLE', 'customer')
+BAE_ADMIN_ROLE = os.environ.get('BAE_ADMIN_ROLE', 'orgAdmin')
 
 BROKER_ROLES = [BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE]
 BAE_ROLES = [BAE_SELLER_ROLE, BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE]
 
 
-secrets_file = "/run/secrets/{}".format(os.environ.get("CREDENTIALS_FILE", "credentials"))
+secrets_file = "/run/secrets/{}".format(os.environ.get("CREDENTIALS_FILE", "credentials.json"))
 if os.path.isfile(secrets_file):
     with open(secrets_file, "r") as f:
         data = json.load(f)

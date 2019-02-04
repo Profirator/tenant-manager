@@ -22,7 +22,7 @@ import json
 from flask import request, make_response
 
 from lib.keyrock_client import KeyrockClient, KeyrockError
-from settings import IDM_HOST, IDM_PASSWD, IDM_USER
+from settings import IDM_URL, IDM_PASSWD, IDM_USER
 
 
 def build_response(body, status):
@@ -40,14 +40,14 @@ def authorized(funct):
                 'error': 'This request requires authentication'
             }, 401)
 
-        keyrock_client = KeyrockClient(IDM_HOST, IDM_USER, IDM_PASSWD)
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
 
         # Authorize user making the request
         token = request.headers.get('authorization').split(' ')[1]
 
         try:
             user_info = keyrock_client.authorize(token)
-        except:
+        except KeyrockError:
             return build_response({
                 'error': 'This request requires authentication'
             }, 401)
@@ -58,4 +58,3 @@ def authorized(funct):
     # Renaming the function name to prevent Flask crashing
     wrapper.__name__ = funct.__name__
     return wrapper
-

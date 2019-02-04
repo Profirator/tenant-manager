@@ -2,9 +2,11 @@ FROM pypy:3-6
 ENV LOGLEVEL=info
 
 COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+RUN mkdir tenant-manager && pip install gunicorn && pip install -r requirements.txt
 
-COPY controller.py /controller.py
+WORKDIR /tenant-manager
+COPY lib/*.py /tenant-manager/lib/
+COPY controller.py settings.py /tenant-manager/
 
 EXPOSE 5000
 
