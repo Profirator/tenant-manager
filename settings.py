@@ -24,6 +24,9 @@ import json
 VERIFY_REQUESTS = True
 
 # Configure using env variables
+MONGO_URL = os.environ.get('MONGO_URL', 'localhost')
+MONGO_PORT = os.environ.get('MONGO_PORT', 27017)
+
 IDM_URL = os.environ.get('IDM_URL', 'http://keyrock:3000')
 IDM_USER = os.environ.get('IDM_USER', 'fdelavega@conwet.com')
 IDM_PASSWD = os.environ.get('IDM_PASSWD', '123456789')
