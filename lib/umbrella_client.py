@@ -87,6 +87,7 @@ class UmbrellaClient():
         Appends a new sub URL setting into an API Umbrella API
         identified by IDM app ID
         """
+
         api_elem = self.get_api_from_app_id(app_id)
         if not 'sub_settings' in api_elem or api_elem['sub_settings'] is None:
             api_elem['sub_settings'] = []
@@ -95,10 +96,14 @@ class UmbrellaClient():
 
         url = urljoin(self._host, '/api-umbrella/v1/apis/{}'.format(api_elem['id']))
 
+        body = {
+            'api': api_elem
+        }
+
         response = requests.put(url, headers={
             'X-Api-Key': self._api_key,
             'X-Admin-Auth-Token': self._admin_token
-        }, json=api_elem, verify=VERIFY_REQUESTS)
+        }, json={'api': api_elem}, verify=VERIFY_REQUESTS)
 
         if response.status_code == 401 or response.status_code == 403:
             raise UmbrellaError('Permissions error accessing API Umbrella')

@@ -344,17 +344,19 @@ class UmbrellaClientTestCase(unittest.TestCase):
         }
 
         exp_body = {
-            'id': 'id',
-            'settings': {
-                'idp_app_id': '2'
-            },
-            'sub_settings': [{
-                'regex': '/',
-                'http_method': 'any'
-            }, {
-                'regex': '/',
-                'http_method': 'get'
-            }]
+            'api': {
+                'id': 'id',
+                'settings': {
+                    'idp_app_id': '2'
+                },
+                'sub_settings': [{
+                    'regex': '/',
+                    'http_method': 'any'
+                }, {
+                    'regex': '/',
+                    'http_method': 'get'
+                }]
+            }
         }
 
         # Verify calls
@@ -451,7 +453,7 @@ class ControllerTestCase(unittest.TestCase):
         ], authorize_calls)
 
         policy = [{
-            "http_method": 'get',
+            "http_method": 'GET',
             "regex": "^/",
             "settings": {
                 "required_headers": [{

@@ -56,7 +56,7 @@ def _build_policy(method, tenant, role):
 def _create_access_policies(tenant, org_id, user_info):
     # Build read and admin policies
     read_role = org_id + '.' + BROKER_CONSUMER_ROLE
-    read_policy = _build_policy('get', tenant, read_role)
+    read_policy = _build_policy('GET', tenant, read_role)
 
     admin_role = org_id + '.' + BROKER_ADMIN_ROLE
     admin_policy = _build_policy('any', tenant, admin_role)
