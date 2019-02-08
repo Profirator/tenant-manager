@@ -458,7 +458,7 @@ class ControllerTestCase(unittest.TestCase):
             "settings": {
                 "required_headers": [{
                     "key": "Fiware-Service",
-                    "value": 'new-tenant'
+                    "value": 'new_tenant'
                 }],
                 "required_roles": [
                     'org_id.' + self._consumer_role
@@ -471,7 +471,7 @@ class ControllerTestCase(unittest.TestCase):
             "settings": {
                 "required_headers": [{
                     "key": "Fiware-Service",
-                    "value": 'new-tenant'
+                    "value": 'new_tenant'
                 }],
                 "required_roles": [
                     'org_id.' + self._admin_role
@@ -485,7 +485,7 @@ class ControllerTestCase(unittest.TestCase):
         )
 
         self._database_controller.save_tenant.assert_called_once_with(
-            'new-tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
+            'new_tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
 
     def test_get_tenants(self):
         org_id = 'org_id'

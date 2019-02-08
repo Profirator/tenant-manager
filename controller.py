@@ -98,7 +98,7 @@ def create(user_info):
 
     try:
         # Build tenant-id 
-        tenant_id = request.json.get('name').lower().replace(' ', '-')
+        tenant_id = request.json.get('name').lower().replace(' ', '_')
         database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
         prev_t = database_controller.get_tenant(tenant_id)
 
