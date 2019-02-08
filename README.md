@@ -48,6 +48,8 @@ organization roles
 
 **Get Tenants**
 
+This method returns all the tenants the user making the request os owner of
+
     GET http://tenantservice/tenant
     HEADERS
         Content-Type: application/json
@@ -66,3 +68,52 @@ organization roles
                 "roles": ["data-provider"]
             }]
         }]
+
+
+**Get Tenant**
+
+This method returns a particular tenant by tenant ID if the user making the request is authorized to do so
+
+    GET http://tenantservice/tenant/[tenant-id]
+    HEADERS
+        Content-Type: application/json
+        Authorization: Bearer [access token]
+
+    RESPONSE
+        [{
+            "id": "tenant-id",
+            "owner_id": owner,
+            "tenant_organization": "org-id",
+            "name": "tenant-name",
+            "description": "tenant description",
+            "users": [{
+                "id": "user-id",
+                "name": "username",
+                "roles": ["data-provider"]
+            }]
+        }]
+
+**Get Available Users**
+
+This method returns the available users in the IDM that can be incorporated into a tenant
+
+    GET http://tenantservice/users
+    HEADERS
+        Content-Type: application/json
+        Authorization: Bearer [access token]
+
+    RESPONSE
+        {
+            "users": [
+                {
+                    "id": "2d6f5391-6130-48d8-a9d0-01f20699a7eb",
+                    "username": "alice",
+                    "email": "alice@test.com",
+                    "enabled": true,
+                    "gravatar": false,
+                    "date_password": "2018-03-20T09:31:07.000Z",
+                    "description": null,
+                    "website": null
+                }
+            ]
+        }

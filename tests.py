@@ -281,6 +281,24 @@ class KeyrockClientTestCase(unittest.TestCase):
             call('http://idm.docker:3000/v1/users/user_id',headers=self._headers, verify=VERIFY_REQUESTS)
         ], get_calls)
 
+    def test_get_users(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        users = {
+            'users': [{
+                'username': 'username'
+            }]
+        }
+        get_users_response = MagicMock(status_code=200)
+        get_users_response.json.return_value = users
+
+        keyrock_client.requests.post.return_value = login_response
+        keyrock_client.requests.get.return_value = get_users_response
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        resp_users = client.get_users()
+
+        self.assertEqual(users, resp_users)
 
 class UmbrellaClientTestCase(unittest.TestCase):
 

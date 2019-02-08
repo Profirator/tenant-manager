@@ -209,6 +209,23 @@ def get_tenant(user_info, tenant_id):
     return build_response(tenant_info, 200)
 
 
+@app.route("/users", methods=['GET'])
+@authorized
+def get_users(user_info):
+    try:
+        # This method is just a proxy to the IDM for reading available users
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
+        return keyrock_client.get_users()
+    except KeyrockError as e:
+        return build_response({
+            'error': str(e)
+        }, 400)
+    except:
+        return build_response({
+            'error': 'An error occurred reading tenants'
+        }, 500)   
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=(os.environ.get("DEBUG", "false").strip().lower() == "true"))
 else:

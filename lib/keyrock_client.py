@@ -258,6 +258,20 @@ class KeyrockClient():
 
         return response.json()['user']
 
+    def get_users(self):
+        """
+        Returns the list of available users
+        """
+        url = urljoin(self._host, '/v1/users')
+        response = requests.get(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 200:
+            raise KeyrockError('It could not be possible to retrieve user info')
+
+        return response.json()
+
     def get_organization_members(self, organization_id):
         """
         Returns the list of users that are members of a given organization
