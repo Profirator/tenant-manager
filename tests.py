@@ -359,7 +359,7 @@ class UmbrellaClientTestCase(unittest.TestCase):
 
         # Verify calls
         umbrella_client.requests.get.assert_called_once_with(
-            'http://umbrella.docker/api-umbrella/v1/apis.json?search[value]=2&search[regex]=false&start=0&length=100',
+            'http://umbrella.docker/api-umbrella/v1/apis.json?start=0&length=100',
             headers=headers, verify=VERIFY_REQUESTS)
 
         umbrella_client.requests.put.assert_called_once_with(

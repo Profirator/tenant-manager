@@ -47,14 +47,14 @@ class UmbrellaClient():
         Searches in API Umbrella for an API which is configured with a particular IDM app ID
         """
         # To limit the number of results, include a search by expected app_id
-        url = urljoin(self._host, '/api-umbrella/v1/apis.json?search[value]={}&search[regex]=false'.format(app_id))
+        url = urljoin(self._host, '/api-umbrella/v1/apis.json')
 
         start = 0
         processed = False
         api_elem = None
 
         while not processed:
-            page_url = url + '&start={}&length={}'.format(start, PAGE_LEN)
+            page_url = url + '?start={}&length={}'.format(start, PAGE_LEN)
             response = requests.get(page_url, headers={
                 'X-Api-Key': self._api_key,
                 'X-Admin-Auth-Token': self._admin_token
@@ -88,7 +88,7 @@ class UmbrellaClient():
         identified by IDM app ID
         """
         api_elem = self.get_api_from_app_id(app_id)
-        if not 'sub_settings' in api_elem:
+        if not 'sub_settings' in api_elem or api_elem['sub_settings'] is None:
             api_elem['sub_settings'] = []
 
         api_elem['sub_settings'].extend(sub_settings)
