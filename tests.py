@@ -300,8 +300,8 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         get_calls = keyrock_client.requests.get.call_args_list
         self.assertEqual([
-            call('http://idm.docker:3000/v1/organizations/org_id/users',headers=self._headers, verify=VERIFY_REQUESTS),
-            call('http://idm.docker:3000/v1/users/user_id',headers=self._headers, verify=VERIFY_REQUESTS)
+            call('http://idm.docker:3000/v1/organizations/org_id/users', headers=self._headers, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/users/user_id', headers=self._headers, verify=VERIFY_REQUESTS)
         ], get_calls)
 
     def test_get_users(self):
@@ -322,6 +322,7 @@ class KeyrockClientTestCase(unittest.TestCase):
         resp_users = client.get_users()
 
         self.assertEqual(users, resp_users)
+
 
 class UmbrellaClientTestCase(unittest.TestCase):
 
@@ -408,7 +409,7 @@ class ControllerTestCase(unittest.TestCase):
 
     def setUp(self):
         def mock_decorator(func):
-            def  wrapper(*args, **kwargs):
+            def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
             wrapper.__name__ = func.__name__
@@ -626,6 +627,45 @@ class ControllerTestCase(unittest.TestCase):
         }
         self._umbrella_client.update_api.assert_called_once_with(exp_api)
         self._database_controller.delete_tenant.assert_called_once_with(tenant_id)
+
+    def test_get_users(self):
+        users = {
+            "users": [
+                {
+                    "id": "2d6f5391-6130-48d8-a9d0-01f20699a7eb",
+                    "username": "alice",
+                    "email": "alice@test.com",
+                    "enabled": True,
+                    "gravatar": False,
+                    "date_password": "2018-03-20T09:31:07.000Z",
+                    "description": None,
+                    "website": None
+                }
+            ]
+        }
+
+        self._keyrock_client.get_users.return_value = users
+
+        tenants_response = controller.get_users(self._user_info)
+
+        self.assertEqual(tenants_response, self._response)
+        controller.build_response.assert_called_once_with(users, 200)
+        self._keyrock_client.get_users.assert_called_once_with()
+
+    def test_get_users_error_connecting_keyrock(self):
+        self._keyrock_client.get_users.side_effect = keyrock_client.KeyrockError("Error")
+
+        tenants_response = controller.get_users(self._user_info)
+
+        self.assertEqual(tenants_response, self._response)
+        controller.build_response.assert_called_once_with({'error': 'Error'}, 503)
+        self._keyrock_client.get_users.assert_called_once_with()
+
+    def test_get_users_unexpected_error(self):
+        self._keyrock_client.get_users.side_effect = ValueError
+
+        self.assertRaises(ValueError, controller.get_users, self._user_info)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

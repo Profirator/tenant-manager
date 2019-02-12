@@ -246,7 +246,7 @@ def delete_tenant(user_info, tenant_id):
         broker_api = umbrella_client.get_api_from_app_id(BROKER_APP_ID)
 
         sub_settings = [setting for setting in broker_api['sub_settings']
-                            if not is_tenant_setting(setting, tenant_id)]
+                        if not is_tenant_setting(setting, tenant_id)]
 
         broker_api['sub_settings'] = sub_settings
         umbrella_client.update_api(broker_api)
@@ -257,7 +257,7 @@ def delete_tenant(user_info, tenant_id):
         return build_response({
             'error': str(e)
         }, 400)
-    except:
+    except Exception:
         return build_response({
             'error': 'An error occurred deleting tenant'
         }, 500)
@@ -275,11 +275,7 @@ def get_users(user_info):
     except KeyrockError as e:
         return build_response({
             'error': str(e)
-        }, 400)
-    except KeyrockError:
-        return build_response({
-            'error': 'An error occurred reading tenants'
-        }, 500)
+        }, 503)
 
 
 if __name__ == '__main__':
