@@ -206,7 +206,7 @@ class KeyrockClientTestCase(unittest.TestCase):
         authorize_response = MagicMock(status_code=201)
 
         keyrock_client.requests.get.return_value = get_roles_response
-        keyrock_client.requests.post.side_effect = [login_response, authorize_response, authorize_response]
+        keyrock_client.requests.post.side_effect = [login_response, authorize_response, authorize_response, authorize_response]
 
         client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
         client.authorize_organization('org_id', 'app_id', 'data-provider', 'data-consumer')
@@ -215,12 +215,22 @@ class KeyrockClientTestCase(unittest.TestCase):
         get_calls = keyrock_client.requests.get.call_args_list
         self.assertEqual([
             call('http://idm.docker:3000/v1/applications/app_id/roles', headers=self._headers, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/applications/app_id/roles', headers=self._headers, verify=VERIFY_REQUESTS),
             call('http://idm.docker:3000/v1/applications/app_id/roles', headers=self._headers, verify=VERIFY_REQUESTS)
         ], get_calls)
 
         owner_body = {
             'role_organization_assignments': {
                 'role_id': '1',
+                'organization_id': 'org_id',
+                'oauth_client_id': 'app_id',
+                'role_organization': 'owner'
+            }
+        }
+
+        owner_member_body = {
+            'role_organization_assignments': {
+                'role_id': '2',
                 'organization_id': 'org_id',
                 'oauth_client_id': 'app_id',
                 'role_organization': 'owner'
@@ -240,6 +250,7 @@ class KeyrockClientTestCase(unittest.TestCase):
         self.assertEqual([
             call('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS),
             call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/1/organization_roles/owner', json=owner_body, headers=self._headers, verify=VERIFY_REQUESTS),
+            call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/2/organization_roles/owner', json=owner_member_body, headers=self._headers, verify=VERIFY_REQUESTS),
             call('http://idm.docker:3000/v1/applications/app_id/organizations/org_id/roles/2/organization_roles/member', json=member_body, headers=self._headers, verify=VERIFY_REQUESTS)
         ], post_calls)
 

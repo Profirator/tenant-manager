@@ -241,6 +241,7 @@ class KeyrockClient():
         """
 
         self.authorize_organization_role(organization_id, app_id, admin_role, 'owner')
+        self.authorize_organization_role(organization_id, app_id, member_role, 'owner')
         self.authorize_organization_role(organization_id, app_id, member_role, 'member')
 
     def get_user(self, user_id):
