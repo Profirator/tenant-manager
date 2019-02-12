@@ -29,7 +29,7 @@ from lib.utils import build_response, authorized
 from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
                       BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
                       BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
-                      MONGO_URL, MONGO_PORT)
+                      MONGO_HOST, MONGO_PORT)
 
 
 app = Flask(__name__)
@@ -98,7 +98,7 @@ def create(user_info):
     try:
         # Build tenant-id
         tenant_id = request.json.get('name').lower().replace(' ', '_')
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         prev_t = database_controller.get_tenant(tenant_id)
 
         if prev_t is not None:
@@ -152,7 +152,7 @@ def create(user_info):
 def get(user_info):
     response_data = []
     try:
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         response_data = database_controller.read_tenants(user_info['id'])
 
         # Load tenant memebers from the IDM
@@ -178,7 +178,7 @@ def get(user_info):
 def get_tenant(user_info, tenant_id):
     tenant_info = None
     try:
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         tenant_info = database_controller.get_tenant(tenant_id)
 
         if tenant_info is None:
@@ -224,7 +224,7 @@ def is_tenant_setting(setting, tenant_id):
 @authorized
 def delete_tenant(user_info, tenant_id):
     try:
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         tenant_info = database_controller.get_tenant(tenant_id)
 
         if tenant_info is None:
@@ -259,7 +259,7 @@ def delete_tenant(user_info, tenant_id):
         }, 400)
     except:
         return build_response({
-            'error': 'An error occurred reading tenants'
+            'error': 'An error occurred deleting tenant'
         }, 500)
 
     return make_response('', 204)
