@@ -18,7 +18,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
-import json
 import logging
 
 from flask import Flask, request, make_response
@@ -27,10 +26,10 @@ from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
 from lib.utils import build_response, authorized
-from settings import IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID, \
-     BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE, \
-     BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY, \
-     MONGO_URL, MONGO_PORT
+from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
+                      BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
+                      BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
+                      MONGO_HOST, MONGO_PORT)
 
 
 app = Flask(__name__)
@@ -97,9 +96,9 @@ def create(user_info):
                 }, 422)
 
     try:
-        # Build tenant-id 
+        # Build tenant-id
         tenant_id = request.json.get('name').lower().replace(' ', '_')
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         prev_t = database_controller.get_tenant(tenant_id)
 
         if prev_t is not None:
@@ -126,7 +125,7 @@ def create(user_info):
                 user_id = keyrock_client.get_user_id(user['name'])
 
                 # Keyrock IDM only supports a single organization role
-                if BROKER_CONSUMER_ROLE in user['roles'] and not BROKER_ADMIN_ROLE in user['roles']:
+                if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
                     keyrock_client.grant_organization_role(org_id, user_id, 'member')
 
                 if BROKER_ADMIN_ROLE in user['roles']:
@@ -153,7 +152,7 @@ def create(user_info):
 def get(user_info):
     response_data = []
     try:
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         response_data = database_controller.read_tenants(user_info['id'])
 
         # Load tenant memebers from the IDM
@@ -166,7 +165,7 @@ def get(user_info):
                 'roles': _map_roles(member)
             } for member in members]
 
-    except:
+    except KeyrockError:
         return build_response({
             'error': 'An error occurred reading tenants'
         }, 500)
@@ -179,7 +178,7 @@ def get(user_info):
 def get_tenant(user_info, tenant_id):
     tenant_info = None
     try:
-        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         tenant_info = database_controller.get_tenant(tenant_id)
 
         if tenant_info is None:
@@ -201,7 +200,7 @@ def get_tenant(user_info, tenant_id):
             'roles': _map_roles(member)
         } for member in members]
 
-    except:
+    except KeyrockError:
         return build_response({
             'error': 'An error occurred reading tenants'
         }, 500)
@@ -220,10 +219,10 @@ def get_users(user_info):
         return build_response({
             'error': str(e)
         }, 400)
-    except:
+    except KeyrockError:
         return build_response({
             'error': 'An error occurred reading tenants'
-        }, 500)   
+        }, 500)
 
 
 if __name__ == '__main__':
