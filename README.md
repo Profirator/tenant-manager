@@ -97,7 +97,7 @@ This method returns a particular tenant by tenant ID if the user making the requ
 
 This method returns the available users in the IDM that can be incorporated into a tenant
 
-    GET http://tenantservice/users
+    GET http://tenantservice/user
     HEADERS
         Content-Type: application/json
         Authorization: Bearer [access token]

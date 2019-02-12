@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Opplafy Tenant Manager
-# Copyright (C) 2019  Future Internet Consulting and Development Solutions S.L.
+# Copyright (C) 2019 Future Internet Consulting and Development Solutions S.L.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published
@@ -29,7 +29,7 @@ from lib.utils import build_response, authorized
 from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
                       BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
                       BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
-                      MONGO_HOST, MONGO_PORT)
+                      MONGO_URL, MONGO_PORT)
 
 
 app = Flask(__name__)
@@ -98,7 +98,7 @@ def create(user_info):
     try:
         # Build tenant-id
         tenant_id = request.json.get('name').lower().replace(' ', '_')
-        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
         prev_t = database_controller.get_tenant(tenant_id)
 
         if prev_t is not None:
@@ -152,7 +152,7 @@ def create(user_info):
 def get(user_info):
     response_data = []
     try:
-        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
         response_data = database_controller.read_tenants(user_info['id'])
 
         # Load tenant memebers from the IDM
@@ -178,7 +178,7 @@ def get(user_info):
 def get_tenant(user_info, tenant_id):
     tenant_info = None
     try:
-        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
+        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
         tenant_info = database_controller.get_tenant(tenant_id)
 
         if tenant_info is None:
@@ -208,13 +208,70 @@ def get_tenant(user_info, tenant_id):
     return build_response(tenant_info, 200)
 
 
-@app.route("/users", methods=['GET'])
+def is_tenant_setting(setting, tenant_id):
+    is_tenant = False
+
+    if 'settings' in setting and 'required_headers' in setting['settings']:
+        for header in setting['settings']['required_headers']:
+            if header['key'].lower() == 'fiware-service' and header['value'] == tenant_id:
+                is_tenant = True
+                break
+
+    return is_tenant
+
+
+@app.route("/tenant/<tenant_id>/", methods=['DELETE'])
+@authorized
+def delete_tenant(user_info, tenant_id):
+    try:
+        database_controller = DatabaseController(host=MONGO_URL, port=MONGO_PORT)
+        tenant_info = database_controller.get_tenant(tenant_id)
+
+        if tenant_info is None:
+            return build_response({
+                'error': 'Tenant {} does not exist'.format(tenant_id)
+            }, 404)
+
+        if tenant_info['user_id'] != user_info['id']:
+            return build_response({
+                'error': 'You are not authorized to delete tenant'
+            }, 403)
+
+        # Delete organization in the IDM
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
+        keyrock_client.delete_organization(tenant_info['tenant_organization'])
+
+        # Delete policies in API Umbrella
+        umbrella_client = UmbrellaClient(UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY)
+        broker_api = umbrella_client.get_api_from_app_id(BROKER_APP_ID)
+
+        sub_settings = [setting for setting in broker_api['sub_settings']
+                            if not is_tenant_setting(setting, tenant_id)]
+
+        broker_api['sub_settings'] = sub_settings
+        umbrella_client.update_api(broker_api)
+
+        # Delete tenant from database
+        database_controller.delete_tenant(tenant_id)
+    except (KeyrockError, UmbrellaError) as e:
+        return build_response({
+            'error': str(e)
+        }, 400)
+    except:
+        return build_response({
+            'error': 'An error occurred reading tenants'
+        }, 500)
+
+    return make_response('', 204)
+
+
+@app.route("/user", methods=['GET'])
 @authorized
 def get_users(user_info):
     try:
         # This method is just a proxy to the IDM for reading available users
         keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
-        return keyrock_client.get_users()
+        return build_response(keyrock_client.get_users(), 200)
     except KeyrockError as e:
         return build_response({
             'error': str(e)

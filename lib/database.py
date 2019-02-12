@@ -51,4 +51,7 @@ class DatabaseController:
             'id': tenant_id
         })
 
-
+    def delete_tenant(self, tenant_id):
+        self._db.tenants.delete_one({
+            'id': tenant_id
+        })

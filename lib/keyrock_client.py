@@ -162,8 +162,6 @@ class KeyrockClient():
         """
         Creates a new organization and asigns the given user as owner
         """
-        # TODO: Validate organzation name as it is not an ID
-
         # Create organization using provided info
         url = urljoin(self._host, '/v1/organizations')
         response = requests.post(url, headers={
@@ -183,6 +181,15 @@ class KeyrockClient():
         self.grant_organization_role(organization_id, owner, 'owner')
 
         return organization_id
+
+    def delete_organization(self, org_id):
+        url = urljoin(self._host, '/v1/organizations/{}'.format(org_id))
+        response = requests.delete(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 204:
+            raise KeyrockError('Keyrock failed deleting organization')
 
     def _search_id(self, url, name, search_elem, key):
         response = requests.get(url, headers={

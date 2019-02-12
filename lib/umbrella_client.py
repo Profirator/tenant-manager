@@ -82,18 +82,7 @@ class UmbrellaClient():
 
         return api_elem
 
-    def add_sub_url_setting_app_id(self, app_id, sub_settings):
-        """
-        Appends a new sub URL setting into an API Umbrella API
-        identified by IDM app ID
-        """
-
-        api_elem = self.get_api_from_app_id(app_id)
-        if not 'sub_settings' in api_elem or api_elem['sub_settings'] is None:
-            api_elem['sub_settings'] = []
-
-        api_elem['sub_settings'].extend(sub_settings)
-
+    def update_api(self, api_elem):
         url = urljoin(self._host, '/api-umbrella/v1/apis/{}'.format(api_elem['id']))
 
         body = {
@@ -110,3 +99,16 @@ class UmbrellaClient():
 
         if response.status_code != 204:
             raise UmbrellaError('Error adding sub setting to API')
+
+    def add_sub_url_setting_app_id(self, app_id, sub_settings):
+        """
+        Appends a new sub URL setting into an API Umbrella API
+        identified by IDM app ID
+        """
+
+        api_elem = self.get_api_from_app_id(app_id)
+        if not 'sub_settings' in api_elem or api_elem['sub_settings'] is None:
+            api_elem['sub_settings'] = []
+
+        api_elem['sub_settings'].extend(sub_settings)
+        self.update_api(api_elem)

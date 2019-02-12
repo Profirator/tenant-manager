@@ -185,6 +185,18 @@ class KeyrockClientTestCase(unittest.TestCase):
             call('http://idm.docker:3000/v1/organizations/org_id/users/owner/organization_roles/owner', headers=self._headers, json=role_body, verify=VERIFY_REQUESTS)
         ], post_calls)
 
+    def test_delete_organization(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+        keyrock_client.requests.post.side_effect = [login_response]
+
+        keyrock_client.requests.delete.return_value = MagicMock(status_code=204)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        client.delete_organization('org_id')
+
+        keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS)
+        keyrock_client.requests.delete.assert_called_once_with('http://idm.docker:3000/v1/organizations/org_id', headers=self._headers, verify=VERIFY_REQUESTS)
+
     def test_authorize_organization(self):
         # Mock login
         login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
@@ -563,6 +575,57 @@ class ControllerTestCase(unittest.TestCase):
         controller.build_response.assert_called_once_with(exp_tenant, 200)
         self._database_controller.get_tenant.assert_called_once_with(tenant_id)
 
+    def test_delete_tenant(self):
+        tenant_id = 'tenant_id'
+        org_id = 'org_id'
+
+        tenant = {
+            'tenant_organization': org_id,
+            'user_id': 'user-id'
+        }
+
+        self._database_controller.get_tenant.return_value = tenant
+
+        broker_api = {
+            'sub_settings': [{
+                'settings': {
+                    'required_headers': [{
+                        'key': 'Fiware-Service',
+                        'value': 'new_tenant'
+                    }]
+                }
+            }, {
+                'settings': {
+                    'required_headers': [{
+                        'key': 'Fiware-Service',
+                        'value': tenant_id
+                    }]
+                }
+            }]
+        }
+        self._umbrella_client.get_api_from_app_id.return_value = broker_api
+
+        controller.delete_tenant(self._user_info, tenant_id)
+
+        controller.make_response.assert_called_once_with('', 204)
+        self._database_controller.get_tenant.assert_called_once_with(tenant_id)
+
+        self._keyrock_client.delete_organization.assert_called_once_with(org_id)
+
+        self._umbrella_client.get_api_from_app_id.assert_called_once_with(self._broker_app)
+
+        exp_api = {
+            'sub_settings': [{
+                'settings': {
+                    'required_headers': [{
+                        'key': 'Fiware-Service',
+                        'value': 'new_tenant'
+                    }]
+                }
+            }]
+        }
+        self._umbrella_client.update_api.assert_called_once_with(exp_api)
+        self._database_controller.delete_tenant.assert_called_once_with(tenant_id)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
