@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import unittest
-from unittest.mock import MagicMock, call
+from unittest.mock import ANY, MagicMock, call
 from importlib import reload
 
 import controller
@@ -510,6 +510,187 @@ class ControllerTestCase(unittest.TestCase):
 
         self._database_controller.save_tenant.assert_called_once_with(
             'new_tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
+
+    def test_create_tenant_with_users(self):
+        # Mock request contents
+        controller.request.json = {
+            "name": "New Tenant",
+            "description": "tenant description",
+            "users": [
+                {
+                    "name": "username",
+                    "roles": [self._admin_role],
+                },
+                {
+                    "name": "user2",
+                    "roles": [self._consumer_role],
+                },
+            ],
+        }
+
+        self._keyrock_client.create_organization.return_value = 'org_id'
+        self._database_controller.get_tenant.return_value = None
+        self._keyrock_client.get_user_id.side_effect = ["username_id", "user2_id"]
+
+        response = controller.create(self._user_info)
+
+        # Validate calls
+        self.assertEqual(self._response, response)
+        controller.make_response.assert_called_once_with('', 201)
+
+        self._keyrock_client.create_organization.assert_called_once_with('New Tenant', 'tenant description', 'user-id')
+
+        self._keyrock_client.authorize_organization.assert_called_once_with(
+            'org_id', self._broker_app, self._admin_role, self._consumer_role
+        )
+
+        authorize_calls = self._keyrock_client.authorize_organization_role.call_args_list
+        self.assertEqual(
+            authorize_calls,
+            [
+                call('org_id', self._bae_app, self._bae_seller, 'owner'),
+                call('org_id', self._bae_app, self._bae_customer, 'owner'),
+                call('org_id', self._bae_app, self._bae_admin, 'owner')
+            ]
+        )
+
+        grant_organization_role_calls = self._keyrock_client.grant_organization_role.call_args_list
+        self.assertEqual(
+            [
+                call('org_id', 'username_id', 'owner'),
+                call('org_id', 'user2_id', 'member')
+            ],
+            grant_organization_role_calls
+        )
+        policy = [{
+            "http_method": 'GET',
+            "regex": "^/",
+            "settings": {
+                "required_headers": [{
+                    "key": "Fiware-Service",
+                    "value": 'new_tenant'
+                }],
+                "required_roles": [
+                    'org_id.' + self._consumer_role
+                ],
+                "required_roles_override": True
+            }
+        }, {
+            "http_method": 'any',
+            "regex": "^/",
+            "settings": {
+                "required_headers": [{
+                    "key": "Fiware-Service",
+                    "value": 'new_tenant'
+                }],
+                "required_roles": [
+                    'org_id.' + self._admin_role
+                ],
+                "required_roles_override": True
+            }
+        }]
+
+        self._umbrella_client.add_sub_url_setting_app_id.assert_called_once_with(
+            self._broker_app, policy
+        )
+
+        self._database_controller.save_tenant.assert_called_once_with(
+            'new_tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
+
+    def test_create_tenant_missing_name(self):
+        # Mock request contents
+        controller.request.json = {
+            'description': 'tenant description'
+        }
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': ANY}, 422)
+        controller.DatabaseController.assert_not_called()
+
+    def test_create_tenant_missing_description(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'New Tenant'
+        }
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': ANY}, 422)
+        controller.DatabaseController.assert_not_called()
+
+    def test_create_tenant_missing_user_name(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'New Tenant',
+            'description': 'tenant description',
+            'users': [{
+                'roles': [self._consumer_role, self._admin_role]
+            }]
+        }
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': ANY}, 422)
+        controller.DatabaseController.assert_not_called()
+
+    def test_create_tenant_missing_user_roles(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'New Tenant',
+            'description': 'tenant description',
+            'users': [{
+                'name': 'username'
+            }]
+        }
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': ANY}, 422)
+        controller.DatabaseController.assert_not_called()
+
+    def test_create_tenant_duplicated_tenant(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'New Tenant',
+            'description': 'tenant description'
+        }
+        self._database_controller.get_tenant.return_value = {}
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': ANY}, 409)
+        controller.KeyrockClient.assert_not_called()
+
+    def test_create_tenant_unexpected_error(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'New Tenant',
+            'description': 'tenant description'
+        }
+        self._database_controller.get_tenant.return_value = None
+        self._database_controller.save_tenant.side_effect = ValueError
+
+        self.assertRaises(ValueError, controller.create, self._user_info)
+
+    def test_create_tenant_error_connecting_keyrock(self):
+        # Mock request contents
+        controller.request.json = {
+            'name': 'New Tenant',
+            'description': 'tenant description'
+        }
+        self._database_controller.get_tenant.return_value = None
+        self._keyrock_client.create_organization.side_effect = keyrock_client.KeyrockError("Error")
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': 'Error'}, 503)
 
     def test_get_tenants(self):
         org_id = 'org_id'

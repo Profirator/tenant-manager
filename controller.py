@@ -119,17 +119,16 @@ def create(user_info):
         keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
 
         # Add tenant users if provided
-        if 'users' in request.json:
-            for user in request.json.get('users'):
-                # User name is not used to identify in Keyrock
-                user_id = keyrock_client.get_user_id(user['name'])
+        for user in request.json.get('users', []):
+            # User names are not used to identify users in Keyrock
+            user_id = keyrock_client.get_user_id(user['name'])
 
-                # Keyrock IDM only supports a single organization role
-                if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
-                    keyrock_client.grant_organization_role(org_id, user_id, 'member')
+            # Keyrock IDM only supports a single organization role
+            if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
+                keyrock_client.grant_organization_role(org_id, user_id, 'member')
 
-                if BROKER_ADMIN_ROLE in user['roles']:
-                    keyrock_client.grant_organization_role(org_id, user_id, 'owner')
+            if BROKER_ADMIN_ROLE in user['roles']:
+                keyrock_client.grant_organization_role(org_id, user_id, 'owner')
 
         _create_access_policies(tenant_id, org_id, user_info)
         database_controller.save_tenant(
@@ -138,11 +137,7 @@ def create(user_info):
     except (KeyrockError, UmbrellaError) as e:
         return build_response({
             'error': str(e)
-        }, 400)
-    except Exception:
-        return build_response({
-            'error': 'Unexpected error creating tenant'
-        }, 500)
+        }, 503)
 
     return make_response('', 201)
 
