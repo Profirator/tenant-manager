@@ -52,7 +52,6 @@ This method returns all the tenants the user making the request os owner of
 
     GET http://tenantservice/tenant
     HEADERS
-        Content-Type: application/json
         Authorization: Bearer [access token]
 
     RESPONSE
@@ -76,7 +75,6 @@ This method returns a particular tenant by tenant ID if the user making the requ
 
     GET http://tenantservice/tenant/[tenant-id]
     HEADERS
-        Content-Type: application/json
         Authorization: Bearer [access token]
 
     RESPONSE
@@ -92,6 +90,25 @@ This method returns a particular tenant by tenant ID if the user making the requ
                 "roles": ["data-provider"]
             }]
         }]
+
+**Update Tenant**
+
+This method allows to update tenant information, including adding and removing users,
+using a JSON Patch format
+
+    PATCH http://tenantservice/tenant/[tenant-id]
+    HEADERS
+        Content-Type: application/json
+        Authorization: Bearer [access token]
+
+    BODY
+        [
+            {"op": "replace", "path": "/description", "value": "New description"},
+            {"op": "remove", "path": "/users/1"},
+            {"op": "remove", "path": "/users/2"},
+            {"op": "add", "path": "/users/-", "value": {"id": "user_id", "name": "user_name", "roles": ["data-provider]}},
+            {"op": "add", "path": "/users/-", "value": {"id": "user_id2", "name": "user_name2", "roles": ["data-customer"]}}
+        ]
 
 **Get Available Users**
 
