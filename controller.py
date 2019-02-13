@@ -119,20 +119,31 @@ def create(user_info):
         keyrock_client.authorize_organization_role(org_id, BAE_APP_ID, BAE_ADMIN_ROLE, 'owner')
 
         # Add tenant users if provided
+        users = []
         for user in request.json.get('users', []):
             # User names are not used to identify users in Keyrock
             user_id = keyrock_client.get_user_id(user['name'])
 
+            user_obj = {
+                'id': user_id,
+                'name': user['name'],
+                'roles': []
+            }
+
             # Keyrock IDM only supports a single organization role
             if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
                 keyrock_client.grant_organization_role(org_id, user_id, 'member')
+                user_obj['roles'].append(BROKER_CONSUMER_ROLE)
 
             if BROKER_ADMIN_ROLE in user['roles']:
                 keyrock_client.grant_organization_role(org_id, user_id, 'owner')
+                user_obj['roles'].append(BROKER_ADMIN_ROLE)
+
+            users.append(user_obj)
 
         _create_access_policies(tenant_id, org_id, user_info)
         database_controller.save_tenant(
-            tenant_id, request.json.get('name'), request.json.get('description'), user_info['id'], org_id)
+            tenant_id, request.json.get('name'), request.json.get('description'), user_info['id'], users, org_id)
 
     except (KeyrockError, UmbrellaError) as e:
         return build_response({
@@ -149,18 +160,7 @@ def get(user_info):
     try:
         database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         response_data = database_controller.read_tenants(user_info['id'])
-
-        # Load tenant memebers from the IDM
-        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
-        for tenant in response_data:
-            members = keyrock_client.get_organization_members(tenant['tenant_organization'])
-            tenant['users'] = [{
-                'id': member['user_id'],
-                'name': member['name'],
-                'roles': _map_roles(member)
-            } for member in members]
-
-    except KeyrockError:
+    except Exception:
         return build_response({
             'error': 'An error occurred reading tenants'
         }, 500)
@@ -186,7 +186,8 @@ def get_tenant(user_info, tenant_id):
                 'error': 'You are not authorized to retrieve tenant info'
             }, 403)
 
-        # Load tenant memebers from the IDM
+        # Get tenant members from the IDM to keep the list
+        # of members syncronized
         keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
         members = keyrock_client.get_organization_members(tenant_info['tenant_organization'])
         tenant_info['users'] = [{
@@ -195,6 +196,7 @@ def get_tenant(user_info, tenant_id):
             'roles': _map_roles(member)
         } for member in members]
 
+        database_controller.update_tenant(tenant_info)
     except KeyrockError:
         return build_response({
             'error': 'An error occurred reading tenants'
@@ -258,6 +260,123 @@ def delete_tenant(user_info, tenant_id):
         }, 500)
 
     return make_response('', 204)
+
+
+def update_tenant_description(keyrock_client, tenant_info, patch):
+    if 'value' not in patch:
+        raise ValueError('Missing value field in JSON Patch replace operation')
+
+    # Update organization description in IDM
+    keyrock_client.update_organization(tenant_info['tenant_organization'], patch['value'])
+    tenant_info['desciption'] = patch['value']
+
+
+def add_tenant_user(keyrock_client, tenant_info, patch):
+    if 'value' not in patch:
+        raise ValueError('Missing value field in JSON Patch add operation')
+
+    user = patch['value']
+    if 'name' not in user or 'roles' not in user:
+        raise ValueError('Invalid user info in JSON Patch')
+
+    if 'id' not in user:
+        user_id = keyrock_client.get_user_id(user['name'])
+    else:
+        user_id = user['id']
+
+    # Check if the user is aleady included
+    for user in tenant_info['users']:
+        if user['id'] == user_id:
+            raise ValueError('The user specified in JSON Patch is already included')
+
+    user_obj = {
+        'id': user_id,
+        'name': user['name'],
+        'roles': []
+    }
+
+    # Add the user as member of the organization
+    if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
+        keyrock_client.grant_organization_role(org_id, user_id, 'member')
+        user_obj['roles'].append(BROKER_CONSUMER_ROLE)
+
+    if BROKER_ADMIN_ROLE in user['roles']:
+        keyrock_client.grant_organization_role(org_id, user_id, 'owner')
+        user_obj['roles'].append(BROKER_ADMIN_ROLE)
+
+    tenant_info['users'].append(user_obj)
+
+
+def remove_tenant_user(keyrock_client, tenant_info, patch):
+    # Get index of the user to be removed
+    path = patch['path'].split('/')
+
+    if len(path) != 3 or not path[2].isdigit():
+        raise ValueError('Invalid format in path element of remove operation')
+
+    index = int(path[2])
+
+    # Check that the index point to a valid user
+    if index >= len(tenant_info['users']):
+        raise ValueError('Index out of range in remove operation')
+
+    user = tenant_info['users'][index]
+
+    if BROKER_ADMIN_ROLE in user['roles']:
+        keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'owner')
+    else:
+        keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'member')
+
+    # Remove user from organization
+    tenant_info['users'].remove(user)
+
+
+@app.route("/tenant/<tenant_id>", methods=['PATCH'])
+@authorized
+def update_tenant(user_info, tenant_id):
+    try:
+        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
+        tenant_info = database_controller.get_tenant(tenant_id)
+
+        if tenant_info is None:
+            return build_response({
+                'error': 'Tenant {} does not exist'.format(tenant_id)
+            }, 404)
+
+        if tenant_info['user_id'] != user_info['id']:
+            return build_response({
+                'error': 'You are not authorized to delete tenant'
+            }, 403)
+
+        # Apply JSON patch
+        # Valid operations replace description, add user, remove user
+        keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
+        for patch in request.json:
+            if 'op' not in patch or 'path' not in patch:
+                raise ValueError('Invalid JSON PATCH format')
+
+            if patch['op'] == 'replace' and patch['path'] == '/description':
+                update_tenant_description(keyrock_client, tenant_info, patch)
+
+            elif patch['op'] == 'add' and patch['path'] == '/users/-':
+                add_tenant_user(keyrock_client, tenant_info, patch)
+
+            elif patch['op'] == 'remove' and patch['path'].startswith('/users/'):
+                remove_tenant_user(keyrock_client, tenant_info, patch)
+
+            else:
+                raise ValueError('Unsupported PATCH operation')
+
+        database_controller.update_tenant(tenant_info)
+
+    except ValueError as e:
+        return build_response({
+            'error': str(e)
+        }, 422)
+    except Exception:
+        return build_response({
+            'error': 'An error occurred adding tenant user'
+        }, 500)
 
 
 @app.route("/user", methods=['GET'])

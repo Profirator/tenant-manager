@@ -89,6 +89,19 @@ class KeyrockClient():
         if response.status_code != 201:
             raise KeyrockError('Keyrock failed assigning role {} in organization'.format(role_id))
 
+    def revoke_organization_role(self, organization_id, owner, role_id):
+        """
+        Revokes the given organization role from a user
+        """
+        url = urljoin(self._host, '/v1/organizations/{}/users/{}/organization_roles/{}'.format(organization_id, owner, role_id))
+
+        response = requests.delete(url, headers={
+            'X-Auth-Token': self._access_token
+        }, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 204:
+            raise KeyrockError('Keyrock failed revoking role {} in organization'.format(role_id))
+
     def grant_application_role(self, app_id, user, role_id):
         """
         """
@@ -190,6 +203,21 @@ class KeyrockClient():
 
         if response.status_code != 204:
             raise KeyrockError('Keyrock failed deleting organization')
+
+    def update_organization(self, org_id, description):
+        url = urljoin(self._host, '/v1/organizations/{}'.format(org_id))
+        body = {
+            'organization': {
+                'description': description
+            }
+        }
+
+        response = requests.patch(url, headers={
+            'X-Auth-Token': self._access_token
+        }, json=body, verify=VERIFY_REQUESTS)
+
+        if response.status_code != 200:
+            raise KeyrockError('Keyrock failed updating organization')
 
     def _search_id(self, url, name, search_elem, key):
         response = requests.get(url, headers={

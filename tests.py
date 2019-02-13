@@ -509,7 +509,7 @@ class ControllerTestCase(unittest.TestCase):
         )
 
         self._database_controller.save_tenant.assert_called_once_with(
-            'new_tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
+            'new_tenant', 'New Tenant', 'tenant description', 'user-id', [], 'org_id')
 
     def test_create_tenant_with_users(self):
         # Mock request contents
@@ -594,8 +594,18 @@ class ControllerTestCase(unittest.TestCase):
             self._broker_app, policy
         )
 
+        exp_users = [{
+            'id': 'username_id',
+            'name': 'username',
+            'roles': [self._admin_role]
+        }, {
+            'id': 'user2_id',
+            'name': 'user2',
+            'roles': [self._consumer_role]
+        }]
+
         self._database_controller.save_tenant.assert_called_once_with(
-            'new_tenant', 'New Tenant', 'tenant description', 'user-id', 'org_id')
+            'new_tenant', 'New Tenant', 'tenant description', 'user-id', exp_users, 'org_id')
 
     def test_create_tenant_missing_name(self):
         # Mock request contents
@@ -695,17 +705,13 @@ class ControllerTestCase(unittest.TestCase):
     def test_get_tenants(self):
         org_id = 'org_id'
 
-        exp_tenants = [{
+        tenants = [{
             'tenant_organization': org_id,
             'users': [{
                 'id': 'user-id',
                 'name': 'username',
                 'roles': [self._consumer_role, self._admin_role]
             }]
-        }]
-
-        tenants = [{
-            'tenant_organization': org_id
         }]
 
         members = [{
@@ -720,7 +726,7 @@ class ControllerTestCase(unittest.TestCase):
         tenants_response = controller.get(self._user_info)
 
         self.assertEqual(tenants_response, self._response)
-        controller.build_response.assert_called_once_with(exp_tenants, 200)
+        controller.build_response.assert_called_once_with(tenants, 200)
         self._database_controller.read_tenants.assert_called_once_with('user-id')
 
     def test_get_tenant(self):
