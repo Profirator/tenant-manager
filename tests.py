@@ -143,6 +143,22 @@ class KeyrockClientTestCase(unittest.TestCase):
         keyrock_client.requests.get.assert_called_once_with('http://idm.docker:3000/user?access_token=access_token')
         user_response.json.assert_called_once_with()
 
+    def test_authorize_user_invalid_token(self):
+        response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+        keyrock_client.requests.post.return_value = response
+
+        keyrock_client.requests.get.return_value = MagicMock(status_code=403)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        error = False
+        try:
+            client.authorize('token')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('Invalid access token', str(e))
+            error = True
+
+        self.assertTrue(error)
+
     def test_create_organization(self):
         # Mock HTTP requests
         login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
@@ -185,6 +201,38 @@ class KeyrockClientTestCase(unittest.TestCase):
             call('http://idm.docker:3000/v1/organizations/org_id/users/owner/organization_roles/owner', headers=self._headers, json=role_body, verify=VERIFY_REQUESTS)
         ], post_calls)
 
+    def test_create_organization_error(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        keyrock_client.requests.post.side_effect = [login_response, MagicMock(status_code=400)]
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+
+        error = False
+        try:
+            org_id = client.create_organization('organization', 'description', 'owner')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('Keyrock failed creating the organization', str(e))
+            error = True
+
+        self.assertTrue(error)
+
+    def test_grant_organization_role_error(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        keyrock_client.requests.post.side_effect = [login_response, MagicMock(status_code=400)]
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+
+        error = False
+        try:
+            org_id = client.grant_organization_role('org_id', 'user_id', 'owner')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('Keyrock failed assigning role owner in organization', str(e))
+            error = True
+
+        self.assertTrue(error)
+
     def test_delete_organization(self):
         login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
         keyrock_client.requests.post.side_effect = [login_response]
@@ -197,6 +245,23 @@ class KeyrockClientTestCase(unittest.TestCase):
         keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS)
         keyrock_client.requests.delete.assert_called_once_with('http://idm.docker:3000/v1/organizations/org_id', headers=self._headers, verify=VERIFY_REQUESTS)
 
+    def test_delete_organization_error(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        keyrock_client.requests.post.return_value = login_response
+        keyrock_client.requests.delete.return_value = MagicMock(status_code=403)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+
+        error = False
+        try:
+            org_id = client.delete_organization('org_id')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('Keyrock failed deleting organization', str(e))
+            error = True
+
+        self.assertTrue(error)
+
     def test_revoke_organization_roles(self):
         login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
         keyrock_client.requests.post.side_effect = [login_response]
@@ -208,6 +273,22 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS)
         keyrock_client.requests.delete.assert_called_once_with('http://idm.docker:3000/v1/organizations/org_id/users/user/organization_roles/owner', headers=self._headers, verify=VERIFY_REQUESTS)
+
+    def test_revoke_organization_role_error(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        keyrock_client.requests.post.side_effect = [login_response, MagicMock(status_code=400)]
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+
+        error = False
+        try:
+            org_id = client.revoke_organization_role('org_id', 'user_id', 'owner')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('Keyrock failed revoking role owner in organization', str(e))
+            error = True
+
+        self.assertTrue(error)
 
     def test_authorize_organization(self):
         # Mock login
@@ -335,6 +416,39 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         self.assertEqual(users, resp_users)
 
+    def test_update_organization(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+        keyrock_client.requests.post.return_value = login_response
+
+        keyrock_client.requests.patch.return_value = MagicMock(status_code=200)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        client.update_organization('org_id', 'New description')
+
+        exp_body = {
+            'organization': {
+                'description': 'New description'
+            }
+        }
+        keyrock_client.requests.patch.assert_called_once_with(
+            'http://idm.docker:3000/v1/organizations/org_id', headers=self._headers, json=exp_body, verify=VERIFY_REQUESTS)
+
+    def test_update_organization_error(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+        keyrock_client.requests.post.return_value = login_response
+
+        keyrock_client.requests.patch.return_value = MagicMock(status_code=400)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+
+        error = False
+        try:
+            client.update_organization('org_id', 'New description')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('Keyrock failed updating organization', str(e))
+            error = True
+
+        self.assertTrue(error)
 
 class UmbrellaClientTestCase(unittest.TestCase):
 
