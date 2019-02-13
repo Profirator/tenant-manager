@@ -933,6 +933,151 @@ class ControllerTestCase(unittest.TestCase):
         }
         self._database_controller.update_tenant.assert_called_once_with(updated_tenant)
 
+    def _test_update_error(self, msg, code):
+        response = controller.update_tenant(self._user_info, 'tenant_id')
+        self.assertEqual(self._response, response)
+
+        controller.build_response.assert_called_once_with({
+            'error': msg
+        }, code)
+
+    def test_update_tenant_not_exists(self):
+        self._database_controller.get_tenant.return_value = None
+        self._test_update_error('Tenant tenant_id does not exist', 404)
+
+    def test_update_tenant_not_authorized(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'invalid',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        self._test_update_error('You are not authorized to delete tenant', 403)
+
+    def test_update_tenant_invalid_format(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'invalid': 'stuff'}
+        ]
+
+        self._test_update_error('Invalid JSON PATCH format', 422)
+
+    def test_update_tenant_unsupported_operation(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/name'}
+        ]
+
+        self._test_update_error('Unsupported PATCH operation', 422)
+
+    def test_update_tenant_missing_value_replace(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/description'}
+        ]
+
+        self._test_update_error('Missing value field in JSON Patch replace operation', 422)
+
+    def test_upadate_tenant_missing_value_add(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'add', 'path': '/users/-'}
+        ]
+
+        self._test_update_error('Missing value field in JSON Patch add operation', 422)
+
+    def test_update_tenant_invalid_user(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'add', 'path': '/users/-', 'value': 'invalid'}
+        ]
+
+        self._test_update_error('Invalid user info in JSON Patch', 422)
+
+    def test_update_tenant_user_included(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': [{
+                'id': 'user_id'
+            }]
+        }
+
+        controller.request.json = [
+            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'name', 'roles': []}}
+        ]
+
+        self._test_update_error('The user specified in JSON Patch is already included', 422)
+
+    def test_update_tenant_invalid_remove_path(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'remove', 'path': '/users/inv'}
+        ]
+
+        self._test_update_error('Invalid format in path element of remove operation', 422)
+
+    def test_update_tenant_invalid_index_remove(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'remove', 'path': '/users/4'}
+        ]
+
+        self._test_update_error('Index out of range in remove operation', 422)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
