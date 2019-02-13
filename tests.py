@@ -872,6 +872,7 @@ class ControllerTestCase(unittest.TestCase):
         controller.request.json = [
             {'op': 'replace', 'path': '/description', 'value': 'New description'},
             {'op': 'remove', 'path': '/users/1'},
+            {'op': 'remove', 'path': '/users/2'},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'user_name', 'roles': [self._admin_role]}},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}}
         ]
@@ -886,6 +887,9 @@ class ControllerTestCase(unittest.TestCase):
             }, {
                 'id': 'user_del',
                 'roles': [self._admin_role]
+            }, {
+                'id': 'user_del2',
+                'roles': [self._consumer_role]
             }]
         }
 
@@ -897,7 +901,11 @@ class ControllerTestCase(unittest.TestCase):
         self._database_controller.get_tenant.assert_called_once_with(tenant_id)
         self._keyrock_client.update_organization.assert_called_once_with(org_id, 'New description')
 
-        self._keyrock_client.revoke_organization_role.assert_called_once_with(org_id, 'user_del', 'owner')
+        revoke_calls = self._keyrock_client.revoke_organization_role.call_args_list
+        self.assertEqual([
+            call(org_id, 'user_del', 'owner'),
+            call(org_id, 'user_del2', 'member')
+        ], revoke_calls)
 
         grant_calls = self._keyrock_client.grant_organization_role.call_args_list
 

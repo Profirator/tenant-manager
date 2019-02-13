@@ -19,6 +19,7 @@
 
 import os
 import logging
+from copy import deepcopy
 
 from flask import Flask, request, make_response
 
@@ -262,16 +263,16 @@ def delete_tenant(user_info, tenant_id):
     return make_response('', 204)
 
 
-def update_tenant_description(keyrock_client, tenant_info, patch):
+def update_tenant_description(keyrock_client, tenant_info, tenant_update, patch):
     if 'value' not in patch:
         raise ValueError('Missing value field in JSON Patch replace operation')
 
     # Update organization description in IDM
     keyrock_client.update_organization(tenant_info['tenant_organization'], patch['value'])
-    tenant_info['description'] = patch['value']
+    tenant_update['description'] = patch['value']
 
 
-def add_tenant_user(keyrock_client, tenant_info, patch):
+def add_tenant_user(keyrock_client, tenant_info, tenant_update, patch):
     if 'value' not in patch:
         raise ValueError('Missing value field in JSON Patch add operation')
 
@@ -285,7 +286,7 @@ def add_tenant_user(keyrock_client, tenant_info, patch):
         user_id = user['id']
 
     # Check if the user is aleady included
-    for prev_user in tenant_info['users']:
+    for prev_user in tenant_update['users']:
         if prev_user['id'] == user_id:
             raise ValueError('The user specified in JSON Patch is already included')
 
@@ -304,10 +305,10 @@ def add_tenant_user(keyrock_client, tenant_info, patch):
         keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'owner')
         user_obj['roles'].append(BROKER_ADMIN_ROLE)
 
-    tenant_info['users'].append(user_obj)
+    tenant_update['users'].append(user_obj)
 
 
-def remove_tenant_user(keyrock_client, tenant_info, patch):
+def remove_tenant_user(keyrock_client, tenant_info, tenant_update, patch):
     # Get index of the user to be removed
     path = patch['path'].split('/')
 
@@ -328,7 +329,7 @@ def remove_tenant_user(keyrock_client, tenant_info, patch):
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'member')
 
     # Remove user from organization
-    tenant_info['users'].remove(user)
+    tenant_update['users'].remove(user)
 
 
 @app.route("/tenant/<tenant_id>", methods=['PATCH'])
@@ -351,23 +352,25 @@ def update_tenant(user_info, tenant_id):
         # Apply JSON patch
         # Valid operations replace description, add user, remove user
         keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
+        tenant_update = deepcopy(tenant_info)
+
         for patch in request.json:
             if 'op' not in patch or 'path' not in patch:
                 raise ValueError('Invalid JSON PATCH format')
 
             if patch['op'] == 'replace' and patch['path'] == '/description':
-                update_tenant_description(keyrock_client, tenant_info, patch)
+                update_tenant_description(keyrock_client, tenant_info, tenant_update, patch)
 
             elif patch['op'] == 'add' and patch['path'] == '/users/-':
-                add_tenant_user(keyrock_client, tenant_info, patch)
+                add_tenant_user(keyrock_client, tenant_info, tenant_update, patch)
 
             elif patch['op'] == 'remove' and patch['path'].startswith('/users/'):
-                remove_tenant_user(keyrock_client, tenant_info, patch)
+                remove_tenant_user(keyrock_client, tenant_info, tenant_update, patch)
 
             else:
                 raise ValueError('Unsupported PATCH operation')
 
-        database_controller.update_tenant(tenant_info)
+        database_controller.update_tenant(tenant_update)
 
     except ValueError as e:
         return build_response({
