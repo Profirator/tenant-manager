@@ -181,7 +181,7 @@ def get_tenant(user_info, tenant_id):
                 'error': 'Tenant {} does not exist'.format(tenant_id)
             }, 404)
 
-        if tenant_info['user_id'] != user_info['id']:
+        if tenant_info['owner_id'] != user_info['id']:
             return build_response({
                 'error': 'You are not authorized to retrieve tenant info'
             }, 403)
@@ -229,7 +229,7 @@ def delete_tenant(user_info, tenant_id):
                 'error': 'Tenant {} does not exist'.format(tenant_id)
             }, 404)
 
-        if tenant_info['user_id'] != user_info['id']:
+        if tenant_info['owner_id'] != user_info['id']:
             return build_response({
                 'error': 'You are not authorized to delete tenant'
             }, 403)
@@ -268,7 +268,7 @@ def update_tenant_description(keyrock_client, tenant_info, patch):
 
     # Update organization description in IDM
     keyrock_client.update_organization(tenant_info['tenant_organization'], patch['value'])
-    tenant_info['desciption'] = patch['value']
+    tenant_info['description'] = patch['value']
 
 
 def add_tenant_user(keyrock_client, tenant_info, patch):
@@ -285,8 +285,8 @@ def add_tenant_user(keyrock_client, tenant_info, patch):
         user_id = user['id']
 
     # Check if the user is aleady included
-    for user in tenant_info['users']:
-        if user['id'] == user_id:
+    for prev_user in tenant_info['users']:
+        if prev_user['id'] == user_id:
             raise ValueError('The user specified in JSON Patch is already included')
 
     user_obj = {
@@ -297,11 +297,11 @@ def add_tenant_user(keyrock_client, tenant_info, patch):
 
     # Add the user as member of the organization
     if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
-        keyrock_client.grant_organization_role(org_id, user_id, 'member')
+        keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'member')
         user_obj['roles'].append(BROKER_CONSUMER_ROLE)
 
     if BROKER_ADMIN_ROLE in user['roles']:
-        keyrock_client.grant_organization_role(org_id, user_id, 'owner')
+        keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'owner')
         user_obj['roles'].append(BROKER_ADMIN_ROLE)
 
     tenant_info['users'].append(user_obj)
@@ -343,7 +343,7 @@ def update_tenant(user_info, tenant_id):
                 'error': 'Tenant {} does not exist'.format(tenant_id)
             }, 404)
 
-        if tenant_info['user_id'] != user_info['id']:
+        if tenant_info['owner_id'] != user_info['id']:
             return build_response({
                 'error': 'You are not authorized to delete tenant'
             }, 403)
@@ -377,6 +377,8 @@ def update_tenant(user_info, tenant_id):
         return build_response({
             'error': 'An error occurred adding tenant user'
         }, 500)
+
+    return make_response('', 200)
 
 
 @app.route("/user", methods=['GET'])

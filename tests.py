@@ -197,6 +197,18 @@ class KeyrockClientTestCase(unittest.TestCase):
         keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS)
         keyrock_client.requests.delete.assert_called_once_with('http://idm.docker:3000/v1/organizations/org_id', headers=self._headers, verify=VERIFY_REQUESTS)
 
+    def test_revoke_organization_roles(self):
+        login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+        keyrock_client.requests.post.side_effect = [login_response]
+
+        keyrock_client.requests.delete.return_value = MagicMock(status_code=204)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        client.revoke_organization_role('org_id', 'user', 'owner')
+
+        keyrock_client.requests.post.assert_called_once_with('http://idm.docker:3000/v3/auth/tokens', json=self._exp_body, verify=VERIFY_REQUESTS)
+        keyrock_client.requests.delete.assert_called_once_with('http://idm.docker:3000/v1/organizations/org_id/users/user/organization_roles/owner', headers=self._headers, verify=VERIFY_REQUESTS)
+
     def test_authorize_organization(self):
         # Mock login
         login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
@@ -735,7 +747,7 @@ class ControllerTestCase(unittest.TestCase):
 
         exp_tenant = {
             'tenant_organization': org_id,
-            'user_id': 'user-id',
+            'owner_id': 'user-id',
             'users': [{
                 'id': 'user-id',
                 'name': 'username',
@@ -745,7 +757,7 @@ class ControllerTestCase(unittest.TestCase):
 
         tenant = {
             'tenant_organization': org_id,
-            'user_id': 'user-id'
+            'owner_id': 'user-id'
         }
 
         members = [{
@@ -769,7 +781,7 @@ class ControllerTestCase(unittest.TestCase):
 
         tenant = {
             'tenant_organization': org_id,
-            'user_id': 'user-id'
+            'owner_id': 'user-id'
         }
 
         self._database_controller.get_tenant.return_value = tenant
@@ -852,6 +864,66 @@ class ControllerTestCase(unittest.TestCase):
         self._keyrock_client.get_users.side_effect = ValueError
 
         self.assertRaises(ValueError, controller.get_users, self._user_info)
+
+    def test_update_tenant(self):
+        tenant_id = 'tenant_id'
+        org_id = 'org_id'
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/description', 'value': 'New description'},
+            {'op': 'remove', 'path': '/users/1'},
+            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'user_name', 'roles': [self._admin_role]}},
+            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}}
+        ]
+
+        self._database_controller.get_tenant.return_value = {
+            'id': tenant_id,
+            'tenant_organization': org_id,
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': [{
+                'id': 'user_id1'
+            }, {
+                'id': 'user_del',
+                'roles': [self._admin_role]
+            }]
+        }
+
+        controller.update_tenant(self._user_info, tenant_id)
+
+        # Validate calls
+        controller.make_response.assert_called_once_with('', 200)
+
+        self._database_controller.get_tenant.assert_called_once_with(tenant_id)
+        self._keyrock_client.update_organization.assert_called_once_with(org_id, 'New description')
+
+        self._keyrock_client.revoke_organization_role.assert_called_once_with(org_id, 'user_del', 'owner')
+
+        grant_calls = self._keyrock_client.grant_organization_role.call_args_list
+
+        self.assertEqual([
+            call(org_id, 'user_id', 'owner'),
+            call(org_id, 'user_id2', 'member')
+        ], grant_calls)
+
+        updated_tenant = {
+            'id': tenant_id,
+            'tenant_organization': org_id,
+            'owner_id': 'user-id',
+            'description': 'New description',
+            'users': [{
+                'id': 'user_id1'
+            }, {
+                'id': 'user_id',
+                'name': 'user_name',
+                'roles': [self._admin_role]
+            }, {
+                'id': 'user_id2',
+                'name': 'user_name2',
+                'roles': [self._consumer_role]
+            }]
+        }
+        self._database_controller.update_tenant.assert_called_once_with(updated_tenant)
 
 
 if __name__ == "__main__":
