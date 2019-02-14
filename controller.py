@@ -123,7 +123,10 @@ def create(user_info):
         users = []
         for user in request.json.get('users', []):
             # User names are not used to identify users in Keyrock
-            user_id = keyrock_client.get_user_id(user['name'])
+            if 'id' not in user:
+                user_id = keyrock_client.get_user_id(user['name'])
+            else:
+                user_id = user['id']
 
             user_obj = {
                 'id': user_id,
