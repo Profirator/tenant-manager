@@ -225,7 +225,7 @@ class KeyrockClient():
         }, verify=VERIFY_REQUESTS)
 
         if response.status_code != 200:
-            raise KeyrockError('{} {} cannot be found'.format(search_elem, user_name))
+            raise KeyrockError('{} {} cannot be found'.format(search_elem, name))
 
         id_ = None
         for elem in response.json()[search_elem.lower() + 's']:
@@ -233,7 +233,7 @@ class KeyrockClient():
                 id_ = elem['id']
                 break
         else:
-            raise KeyrockError('{} {} cannot be found'.format(search_elem, user_name))
+            raise KeyrockError('{} {} cannot be found'.format(search_elem, name))
 
         return id_
 
