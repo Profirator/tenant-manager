@@ -20,6 +20,7 @@
 import json
 
 from flask import request, make_response
+import mimeparse
 
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from settings import IDM_URL, IDM_PASSWD, IDM_USER
@@ -58,3 +59,35 @@ def authorized(funct):
     # Renaming the function name to prevent Flask crashing
     wrapper.__name__ = funct.__name__
     return wrapper
+
+
+def get_content_type(request):
+    content_type_header = request.headers.get('content-type')
+    if content_type_header is not None:
+        try:
+            type, subtype, params = mimeparse.parse_mime_type(content_type_header)
+            return type + "/" + subtype
+        except mimeparse.MimeTypeParseException:
+            pass
+
+    return ''
+
+
+def consumes(mime_types):
+
+    if type(mime_types) == str:
+        mime_types = (mime_types,)
+
+    def wrap(func):
+        def wrapper(*args, **kwargs):
+            if get_content_type(request) not in mime_types:
+                return build_response({
+                    'error': 'Unsupported request media type'
+                }, 415)
+
+            return func(*args, **kwargs)
+        # Renaming the function name to prevent Flask crashing
+        wrapper.__name__ = func.__name__
+        return wrapper
+
+    return wrap

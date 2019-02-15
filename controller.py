@@ -26,7 +26,7 @@ from flask import Flask, request, make_response
 from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
-from lib.utils import build_response, authorized
+from lib.utils import authorized, build_response, consumes
 from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
                       BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
                       BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
@@ -77,6 +77,7 @@ def _map_roles(member):
 
 @app.route("/tenant", methods=['POST'])
 @authorized
+@consumes("application/json")
 def create(user_info):
     # Get tenant info for JSON request
     if 'name' not in request.json:
@@ -165,13 +166,9 @@ def create(user_info):
 @authorized
 def get(user_info):
     response_data = []
-    try:
-        database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
-        response_data = database_controller.read_tenants(user_info['id'])
-    except Exception:
-        return build_response({
-            'error': 'An error occurred reading tenants'
-        }, 500)
+
+    database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
+    response_data = database_controller.read_tenants(user_info['id'])
 
     return build_response(response_data, 200)
 
@@ -262,10 +259,6 @@ def delete_tenant(user_info, tenant_id):
         return build_response({
             'error': str(e)
         }, 400)
-    except Exception:
-        return build_response({
-            'error': 'An error occurred deleting tenant'
-        }, 500)
 
     return make_response('', 204)
 
@@ -341,6 +334,7 @@ def remove_tenant_user(keyrock_client, tenant_info, tenant_update, patch):
 
 @app.route("/tenant/<tenant_id>", methods=['PATCH'])
 @authorized
+@consumes('application/json')
 def update_tenant(user_info, tenant_id):
     try:
         database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
@@ -383,10 +377,6 @@ def update_tenant(user_info, tenant_id):
         return build_response({
             'error': str(e)
         }, 422)
-    except Exception:
-        return build_response({
-            'error': 'An error occurred adding tenant user'
-        }, 500)
 
     return make_response('', 200)
 
