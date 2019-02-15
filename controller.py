@@ -96,6 +96,7 @@ def create(user_info):
                     'error': 'Missing required field in user specification'
                 }, 422)
 
+    tenant_id = None
     try:
         # Build tenant-id
         tenant_id = request.json.get('name').lower().replace(' ', '_')
@@ -154,7 +155,10 @@ def create(user_info):
             'error': str(e)
         }, 503)
 
-    return make_response('', 201)
+    response = make_response('', 201)
+    response.headers['Location'] = request.path + '/' + tenant_id
+
+    return response
 
 
 @app.route("/tenant", methods=['GET'])
