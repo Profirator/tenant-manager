@@ -22,6 +22,7 @@ import logging
 from copy import deepcopy
 
 from flask import Flask, request, make_response
+import mimeparse
 
 from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
@@ -392,6 +393,19 @@ def get_users(user_info):
         return build_response({
             'error': str(e)
         }, 503)
+
+
+@app.before_request
+def check_client_accpets_application_json():
+    accept_header = request.headers.get('accept', '*/*')
+    best_response_mimetype = mimeparse.best_match(('application/json',), accept_header)
+    if best_response_mimetype == '':
+        msg = "The requested resource is only capable of generating content not acceptable according to the Accept headers sent in the request"
+        details = {'supported_mime_types': ['application/json']}
+        return build_response({
+            'error': msg,
+            'details': details
+        }, 406)
 
 
 if __name__ == '__main__':
