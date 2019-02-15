@@ -159,6 +159,45 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         self.assertTrue(error)
 
+    def test_get_user_id_request_error(self):
+        response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        keyrock_client.requests.post.return_value = response
+
+        keyrock_client.requests.get.return_value = MagicMock(status_code=400)
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        error = False
+        try:
+            client.get_user_id('user_name')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('User user_name cannot be found', str(e))
+            error = True
+
+        self.assertTrue(error)
+
+    def test_get_user_id_not_found(self):
+        response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
+
+        keyrock_client.requests.post.return_value = response
+
+        get_response = MagicMock(status_code=200)
+        get_response.json.return_value = {
+            'users': []
+        }
+
+        keyrock_client.requests.get.return_value = get_response
+
+        client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
+        error = False
+        try:
+            client.get_user_id('user_name')
+        except keyrock_client.KeyrockError as e:
+            self.assertEqual('User user_name cannot be found', str(e))
+            error = True
+
+        self.assertTrue(error)
+
     def test_create_organization(self):
         # Mock HTTP requests
         login_response = MagicMock(status_code=201, headers={'x-subject-token': self._x_subject_token})
