@@ -408,6 +408,27 @@ def check_client_accpets_application_json():
         }, 406)
 
 
+@app.errorhandler(400)
+def bad_request(e):
+    return build_response({
+        'error': e.description
+    }, 400)
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return build_response({
+        'error': 'API endpoint not found'
+    }, 404)
+
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return build_response({
+        'error': 'Internal server error'
+    }, 500)
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=(os.environ.get("DEBUG", "false").strip().lower() == "true"))
 else:
