@@ -44,6 +44,7 @@ class DatabaseController:
     def read_tenants(self, owner):
         def serialize_ids(t):
             del t['_id']
+            return t
 
         return [serialize_ids(tenant) for tenant in self._db.tenants.find({'owner_id': owner})]
 
