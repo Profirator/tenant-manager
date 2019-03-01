@@ -35,6 +35,7 @@ from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
 
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
 
 
 def _build_policy(method, tenant, role):
@@ -223,7 +224,7 @@ def is_tenant_setting(setting, tenant_id):
     return is_tenant
 
 
-@app.route("/tenant/<tenant_id>/", methods=['DELETE'])
+@app.route("/tenant/<tenant_id>", methods=['DELETE'])
 @authorized
 def delete_tenant(user_info, tenant_id):
     try:
