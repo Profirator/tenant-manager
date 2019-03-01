@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import unittest
-from unittest.mock import ANY, MagicMock, call
+from unittest.mock import ANY, call, MagicMock, patch
 from importlib import reload
 
 import controller
@@ -249,7 +249,7 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         error = False
         try:
-            org_id = client.create_organization('organization', 'description', 'owner')
+            client.create_organization('organization', 'description', 'owner')
         except keyrock_client.KeyrockError as e:
             self.assertEqual('Keyrock failed creating the organization', str(e))
             error = True
@@ -265,7 +265,7 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         error = False
         try:
-            org_id = client.grant_organization_role('org_id', 'user_id', 'owner')
+            client.grant_organization_role('org_id', 'user_id', 'owner')
         except keyrock_client.KeyrockError as e:
             self.assertEqual('Keyrock failed assigning role owner in organization', str(e))
             error = True
@@ -294,7 +294,7 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         error = False
         try:
-            org_id = client.delete_organization('org_id')
+            client.delete_organization('org_id')
         except keyrock_client.KeyrockError as e:
             self.assertEqual('Keyrock failed deleting organization', str(e))
             error = True
@@ -322,7 +322,7 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         error = False
         try:
-            org_id = client.revoke_organization_role('org_id', 'user_id', 'owner')
+            client.revoke_organization_role('org_id', 'user_id', 'owner')
         except keyrock_client.KeyrockError as e:
             self.assertEqual('Keyrock failed revoking role owner in organization', str(e))
             error = True
@@ -489,6 +489,7 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         self.assertTrue(error)
 
+
 class UmbrellaClientTestCase(unittest.TestCase):
 
     _host = 'http://umbrella.docker/'
@@ -559,6 +560,7 @@ class UmbrellaClientTestCase(unittest.TestCase):
         )
 
 
+@patch("lib.utils.get_content_type", new=MagicMock(return_value="application/json"))
 class ControllerTestCase(unittest.TestCase):
 
     _broker_app = 'broker_app'
