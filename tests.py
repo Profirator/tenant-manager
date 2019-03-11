@@ -462,7 +462,7 @@ class KeyrockClientTestCase(unittest.TestCase):
         keyrock_client.requests.patch.return_value = MagicMock(status_code=200)
 
         client = keyrock_client.KeyrockClient(self._host, self._user, self._passwd)
-        client.update_organization('org_id', 'New description')
+        client.update_organization('org_id', {'description': 'New description'})
 
         exp_body = {
             'organization': {
@@ -1027,7 +1027,7 @@ class ControllerTestCase(unittest.TestCase):
         controller.request.json = [
             {'op': 'replace', 'path': '/description', 'value': 'New description'},
             {'op': 'remove', 'path': '/users/1'},
-            {'op': 'remove', 'path': '/users/2'},
+            {'op': 'remove', 'path': '/users/1'},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'user_name', 'roles': [self._admin_role]}},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}}
         ]
@@ -1035,6 +1035,7 @@ class ControllerTestCase(unittest.TestCase):
         self._database_controller.get_tenant.return_value = {
             'id': tenant_id,
             'tenant_organization': org_id,
+            'name': 'Tenant name',
             'owner_id': 'user-id',
             'description': 'Initial description',
             'users': [{
@@ -1054,7 +1055,7 @@ class ControllerTestCase(unittest.TestCase):
         controller.make_response.assert_called_once_with('', 200)
 
         self._database_controller.get_tenant.assert_called_once_with(tenant_id)
-        self._keyrock_client.update_organization.assert_called_once_with(org_id, 'New description')
+        self._keyrock_client.update_organization.assert_called_once_with(org_id, {'description': 'New description'})
 
         revoke_calls = self._keyrock_client.revoke_organization_role.call_args_list
         self.assertEqual([
@@ -1072,6 +1073,7 @@ class ControllerTestCase(unittest.TestCase):
         updated_tenant = {
             'id': tenant_id,
             'tenant_organization': org_id,
+            'name': 'Tenant name',
             'owner_id': 'user-id',
             'description': 'New description',
             'users': [{
@@ -1124,11 +1126,12 @@ class ControllerTestCase(unittest.TestCase):
             {'invalid': 'stuff'}
         ]
 
-        self._test_update_error('Invalid JSON PATCH format', 422)
+        self._test_update_error("Invalid JSON PATCH format: Operation does not contain 'op' member", 400)
 
     def test_update_tenant_unsupported_operation(self):
         self._database_controller.get_tenant.return_value = {
             'id': 'tenant_id',
+            'name': 'Tenant name',
             'tenant_organization': 'org_id',
             'owner_id': 'user-id',
             'description': 'Initial description',
@@ -1136,10 +1139,10 @@ class ControllerTestCase(unittest.TestCase):
         }
 
         controller.request.json = [
-            {'op': 'replace', 'path': '/name'}
+            {'op': 'replace', 'path': '/id', 'value': 'new_id'}
         ]
 
-        self._test_update_error('Unsupported PATCH operation', 422)
+        self._test_update_error('Tenant ID cannot be modified', 422)
 
     def test_update_tenant_missing_value_replace(self):
         self._database_controller.get_tenant.return_value = {
@@ -1154,7 +1157,7 @@ class ControllerTestCase(unittest.TestCase):
             {'op': 'replace', 'path': '/description'}
         ]
 
-        self._test_update_error('Missing value field in JSON Patch replace operation', 422)
+        self._test_update_error("Invalid JSON PATCH format: The operation does not contain a 'value' member", 400)
 
     def test_upadate_tenant_missing_value_add(self):
         self._database_controller.get_tenant.return_value = {
@@ -1169,11 +1172,12 @@ class ControllerTestCase(unittest.TestCase):
             {'op': 'add', 'path': '/users/-'}
         ]
 
-        self._test_update_error('Missing value field in JSON Patch add operation', 422)
+        self._test_update_error("Invalid JSON PATCH format: The operation does not contain a 'value' member", 400)
 
     def test_update_tenant_invalid_user(self):
         self._database_controller.get_tenant.return_value = {
             'id': 'tenant_id',
+            'name': 'tenant name',
             'tenant_organization': 'org_id',
             'owner_id': 'user-id',
             'description': 'Initial description',
@@ -1189,6 +1193,7 @@ class ControllerTestCase(unittest.TestCase):
     def test_update_tenant_user_included(self):
         self._database_controller.get_tenant.return_value = {
             'id': 'tenant_id',
+            'name': 'Tenant name',
             'tenant_organization': 'org_id',
             'owner_id': 'user-id',
             'description': 'Initial description',
@@ -1201,22 +1206,7 @@ class ControllerTestCase(unittest.TestCase):
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'name', 'roles': []}}
         ]
 
-        self._test_update_error('The user specified in JSON Patch is already included', 422)
-
-    def test_update_tenant_invalid_remove_path(self):
-        self._database_controller.get_tenant.return_value = {
-            'id': 'tenant_id',
-            'tenant_organization': 'org_id',
-            'owner_id': 'user-id',
-            'description': 'Initial description',
-            'users': []
-        }
-
-        controller.request.json = [
-            {'op': 'remove', 'path': '/users/inv'}
-        ]
-
-        self._test_update_error('Invalid format in path element of remove operation', 422)
+        self._test_update_error('User info cannot be modified in PATCH operation', 422)
 
     def test_update_tenant_invalid_index_remove(self):
         self._database_controller.get_tenant.return_value = {
@@ -1231,7 +1221,7 @@ class ControllerTestCase(unittest.TestCase):
             {'op': 'remove', 'path': '/users/4'}
         ]
 
-        self._test_update_error('Index out of range in remove operation', 422)
+        self._test_update_error('Conflict applying PATCH, verify indexes and keys', 409)
 
 
 if __name__ == "__main__":

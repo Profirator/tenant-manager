@@ -204,12 +204,10 @@ class KeyrockClient():
         if response.status_code != 204:
             raise KeyrockError('Keyrock failed deleting organization')
 
-    def update_organization(self, org_id, description):
+    def update_organization(self, org_id, update):
         url = urljoin(self._host, '/v1/organizations/{}'.format(org_id))
         body = {
-            'organization': {
-                'description': description
-            }
+            'organization': update
         }
 
         response = requests.patch(url, headers={

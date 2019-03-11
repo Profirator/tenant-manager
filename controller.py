@@ -19,6 +19,7 @@
 
 import os
 import logging
+import jsonpatch
 from copy import deepcopy
 
 from flask import Flask, request, make_response
@@ -265,33 +266,12 @@ def delete_tenant(user_info, tenant_id):
     return make_response('', 204)
 
 
-def update_tenant_description(keyrock_client, tenant_info, tenant_update, patch):
-    if 'value' not in patch:
-        raise ValueError('Missing value field in JSON Patch replace operation')
+def add_tenant_user(keyrock_client, tenant_info, user):
 
-    # Update organization description in IDM
-    keyrock_client.update_organization(tenant_info['tenant_organization'], patch['value'])
-    tenant_update['description'] = patch['value']
-
-
-def add_tenant_user(keyrock_client, tenant_info, tenant_update, patch):
-    if 'value' not in patch:
-        raise ValueError('Missing value field in JSON Patch add operation')
-
-    user = patch['value']
     if 'name' not in user or 'roles' not in user:
         raise ValueError('Invalid user info in JSON Patch')
 
-    if 'id' not in user:
-        user_id = keyrock_client.get_user_id(user['name'])
-    else:
-        user_id = user['id']
-
-    # Check if the user is aleady included
-    for prev_user in tenant_update['users']:
-        if prev_user['id'] == user_id:
-            raise ValueError('The user specified in JSON Patch is already included')
-
+    user_id = user['id']
     user_obj = {
         'id': user_id,
         'name': user['name'],
@@ -307,31 +287,31 @@ def add_tenant_user(keyrock_client, tenant_info, tenant_update, patch):
         keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'owner')
         user_obj['roles'].append(BROKER_ADMIN_ROLE)
 
-    tenant_update['users'].append(user_obj)
 
-
-def remove_tenant_user(keyrock_client, tenant_info, tenant_update, patch):
-    # Get index of the user to be removed
-    path = patch['path'].split('/')
-
-    if len(path) != 3 or not path[2].isdigit():
-        raise ValueError('Invalid format in path element of remove operation')
-
-    index = int(path[2])
-
-    # Check that the index point to a valid user
-    if index >= len(tenant_info['users']):
-        raise ValueError('Index out of range in remove operation')
-
-    user = tenant_info['users'][index]
-
+def remove_tenant_user(keyrock_client, tenant_info, user):
     if BROKER_ADMIN_ROLE in user['roles']:
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'owner')
     else:
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'member')
 
-    # Remove user from organization
-    tenant_update['users'].remove(user)
+
+def process_users_diff(users_src, users_dst):
+    different = []
+    for user in users_src:
+        for prev_user in users_dst:
+            if 'id' not in user or 'id' not in prev_user:
+                raise ValueError('Invalid user info in JSON Patch')
+
+            if user['id'] == prev_user['id']:
+                # If the user is present, its info must not had changed
+                if user != prev_user:
+                    raise ValueError('User info cannot be modified in PATCH operation')
+
+                break
+        else:
+            different.append(user)
+
+    return different
 
 
 @app.route("/tenant/<tenant_id>", methods=['PATCH'])
@@ -352,26 +332,46 @@ def update_tenant(user_info, tenant_id):
                 'error': 'You are not authorized to delete tenant'
             }, 403)
 
+        patch = jsonpatch.JsonPatch(request.json)
+
         # Apply JSON patch
         # Valid operations replace description, add user, remove user
         keyrock_client = KeyrockClient(IDM_URL, IDM_USER, IDM_PASSWD)
-        tenant_update = deepcopy(tenant_info)
+        tenant_update = patch.apply(tenant_info)
 
-        for patch in request.json:
-            if 'op' not in patch or 'path' not in patch:
-                raise ValueError('Invalid JSON PATCH format')
+        if len(tenant_update) != len(tenant_info):
+            raise ValueError('It is not allowed to add or remove fields from tenant')
 
-            if patch['op'] == 'replace' and patch['path'] == '/description':
-                update_tenant_description(keyrock_client, tenant_info, tenant_update, patch)
+        if tenant_update['id'] != tenant_id:
+            raise ValueError('Tenant ID cannot be modified')
 
-            elif patch['op'] == 'add' and patch['path'] == '/users/-':
-                add_tenant_user(keyrock_client, tenant_info, tenant_update, patch)
+        if tenant_update['tenant_organization'] != tenant_info['tenant_organization']:
+            raise ValueError('Tenant organization cannot be modified')
 
-            elif patch['op'] == 'remove' and patch['path'].startswith('/users/'):
-                remove_tenant_user(keyrock_client, tenant_info, tenant_update, patch)
+        if tenant_update['owner_id'] != tenant_info['owner_id']:
+            raise ValueError('Tenant owner ID cannot be modified')
 
-            else:
-                raise ValueError('Unsupported PATCH operation')
+        if tenant_update['description'] != tenant_info['description'] \
+                or tenant_update['name'] != tenant_info['name']:
+
+            update = {}
+            if tenant_update['description'] != tenant_info['description']:
+                update['description'] = tenant_update['description']
+
+            if tenant_update['name'] != tenant_info['name']:
+                update['name'] = tenant_update['name']
+
+            keyrock_client.update_organization(tenant_update['tenant_organization'], update)
+
+        if tenant_update['users'] != tenant_info['users']:
+            to_add = process_users_diff(tenant_update['users'], tenant_info['users'])
+            to_del = process_users_diff(tenant_info['users'], tenant_update['users'])
+
+            for user in to_add:
+                add_tenant_user(keyrock_client, tenant_info, user)
+
+            for user in to_del:
+                remove_tenant_user(keyrock_client, tenant_info, user)
 
         database_controller.update_tenant(tenant_id, tenant_update)
 
@@ -379,6 +379,18 @@ def update_tenant(user_info, tenant_id):
         return build_response({
             'error': str(e)
         }, 422)
+    except jsonpatch.JsonPatchTestFailed:
+        return build_response({
+            'error': 'Test operation not successful'
+        }, 409)
+    except jsonpatch.JsonPatchConflict:
+        return build_response({
+            'error': 'Conflict applying PATCH, verify indexes and keys'
+        }, 409)
+    except jsonpatch.InvalidJsonPatch as e:
+        return build_response({
+            'error': 'Invalid JSON PATCH format: ' + str(e)
+        }, 400)
 
     return make_response('', 200)
 
