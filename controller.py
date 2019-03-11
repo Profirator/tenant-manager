@@ -203,7 +203,7 @@ def get_tenant(user_info, tenant_id):
             'roles': _map_roles(member)
         } for member in members]
 
-        database_controller.update_tenant(tenant_info)
+        database_controller.update_tenant(tenant_id, tenant_info)
     except KeyrockError:
         return build_response({
             'error': 'An error occurred reading tenants'
@@ -373,7 +373,7 @@ def update_tenant(user_info, tenant_id):
             else:
                 raise ValueError('Unsupported PATCH operation')
 
-        database_controller.update_tenant(tenant_update)
+        database_controller.update_tenant(tenant_id, tenant_update)
 
     except ValueError as e:
         return build_response({

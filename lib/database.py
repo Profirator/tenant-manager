@@ -58,5 +58,7 @@ class DatabaseController:
             'id': tenant_id
         })
 
-    def update_tenant(self, tenant):
-        self._db.tenants.update(tenant)
+    def update_tenant(self, tenant_id, tenant):
+        self._db.tenants.replace_one({
+            'id': tenant_id
+        }, tenant)

@@ -1086,7 +1086,7 @@ class ControllerTestCase(unittest.TestCase):
                 'roles': [self._consumer_role]
             }]
         }
-        self._database_controller.update_tenant.assert_called_once_with(updated_tenant)
+        self._database_controller.update_tenant.assert_called_once_with(tenant_id, updated_tenant)
 
     def _test_update_error(self, msg, code):
         response = controller.update_tenant(self._user_info, 'tenant_id')
