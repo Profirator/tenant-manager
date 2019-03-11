@@ -27,7 +27,7 @@ import mimeparse
 from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
-from lib.utils import authorized, build_response, consumes
+from lib.utils import authorized, build_response, consumes, URLify
 from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
                       BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
                       BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
@@ -102,7 +102,7 @@ def create(user_info):
     tenant_id = None
     try:
         # Build tenant-id
-        tenant_id = request.json.get('name').lower().replace(' ', '_')
+        tenant_id = URLify(request.json.get('name'))
         database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         prev_t = database_controller.get_tenant(tenant_id)
 
