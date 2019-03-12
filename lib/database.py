@@ -49,9 +49,12 @@ class DatabaseController:
         return [serialize_ids(tenant) for tenant in self._db.tenants.find({'owner_id': owner})]
 
     def get_tenant(self, tenant_id):
-        return self._db.tenants.find_one({
+        tenant = self._db.tenants.find_one({
             'id': tenant_id
         })
+
+        del tenant['_id']
+        return tenant
 
     def delete_tenant(self, tenant_id):
         self._db.tenants.delete_one({
