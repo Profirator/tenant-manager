@@ -1026,10 +1026,14 @@ class ControllerTestCase(unittest.TestCase):
 
         controller.request.json = [
             {'op': 'replace', 'path': '/description', 'value': 'New description'},
+            {'op': 'replace', 'path': '/name', 'value': 'New name'},
+            {'op': 'test', 'path': '/users/1/id', 'value': 'user_del'},
+            {'op': 'test', 'path': '/users/2/id', 'value': 'user_del2'},
             {'op': 'remove', 'path': '/users/1'},
             {'op': 'remove', 'path': '/users/1'},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'user_name', 'roles': [self._admin_role]}},
-            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}}
+            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}},
+            {'op': 'add', 'path': '/users/0', 'value': {'id': 'user_id3', 'name': 'user_name3', 'roles': [self._consumer_role]}}
         ]
 
         self._database_controller.get_tenant.return_value = {
@@ -1055,7 +1059,7 @@ class ControllerTestCase(unittest.TestCase):
         controller.make_response.assert_called_once_with('', 200)
 
         self._database_controller.get_tenant.assert_called_once_with(tenant_id)
-        self._keyrock_client.update_organization.assert_called_once_with(org_id, {'description': 'New description'})
+        self._keyrock_client.update_organization.assert_called_once_with(org_id, {'description': 'New description', 'name': 'New name'})
 
         revoke_calls = self._keyrock_client.revoke_organization_role.call_args_list
         self.assertEqual([
@@ -1066,6 +1070,7 @@ class ControllerTestCase(unittest.TestCase):
         grant_calls = self._keyrock_client.grant_organization_role.call_args_list
 
         self.assertEqual([
+            call(org_id, 'user_id3', 'member'),
             call(org_id, 'user_id', 'owner'),
             call(org_id, 'user_id2', 'member')
         ], grant_calls)
@@ -1073,10 +1078,14 @@ class ControllerTestCase(unittest.TestCase):
         updated_tenant = {
             'id': tenant_id,
             'tenant_organization': org_id,
-            'name': 'Tenant name',
+            'name': 'New name',
             'owner_id': 'user-id',
             'description': 'New description',
             'users': [{
+                'id': 'user_id3',
+                'name': 'user_name3',
+                'roles': [self._consumer_role]
+            }, {
                 'id': 'user_id1'
             }, {
                 'id': 'user_id',
@@ -1097,6 +1106,108 @@ class ControllerTestCase(unittest.TestCase):
         controller.build_response.assert_called_once_with({
             'error': msg
         }, code)
+
+    def test_update_tenant_user_name(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'name': 'Tenant name',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': [{
+                'id': 'user_id',
+                'name': 'user_name'
+            }]
+        }
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/users/0/name', 'value': 'invalid'}
+        ]
+
+        self._test_update_error('User info cannot be modified in PATCH operation', 422)
+
+    def test_update_tenant_remove_user_id(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'name': 'Tenant name',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': [{
+                'id': 'user_id',
+                'name': 'user_name'
+            }]
+        }
+
+        controller.request.json = [
+            {'op': 'remove', 'path': '/users/0/id'}
+        ]
+
+        self._test_update_error('Invalid user info in JSON Patch', 422)
+
+    def test_update_tenant_unsuccess_test_op(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'name': 'Tenant name',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'test', 'path': '/name', 'value': 'invalid'}
+        ]
+
+        self._test_update_error('Test operation not successful', 409)
+
+    def test_update_tenant_remove_element(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'name': 'Tenant name',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'remove', 'path': '/name'}
+        ]
+
+        self._test_update_error('It is not allowed to add or remove fields from tenant', 422)
+
+    def test_update_tenant_modify_organization(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'name': 'Tenant name',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/tenant_organization', 'value': 'new'}
+        ]
+
+        self._test_update_error('Tenant organization cannot be modified', 422)
+
+    def test_update_tenant_modify_owner(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'tenant_organization': 'org_id',
+            'name': 'Tenant name',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': []
+        }
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/owner_id', 'value': 'new'}
+        ]
+
+        self._test_update_error('Tenant owner ID cannot be modified', 422)
 
     def test_update_tenant_not_exists(self):
         self._database_controller.get_tenant.return_value = None
