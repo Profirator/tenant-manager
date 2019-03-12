@@ -404,7 +404,7 @@ class KeyrockClientTestCase(unittest.TestCase):
 
         members = {
             'organization_users': [{
-                'id': 'user_id'
+                'user_id': 'user_id'
             }]
         }
         get_members_response = MagicMock(status_code=200)
@@ -425,7 +425,7 @@ class KeyrockClientTestCase(unittest.TestCase):
         members_response = client.get_organization_members(org_id)
 
         exp_response = [{
-            'id': 'user_id',
+            'user_id': 'user_id',
             'name': 'username'
         }]
         self.assertEqual(exp_response, members_response)

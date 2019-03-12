@@ -321,6 +321,6 @@ class KeyrockClient():
 
         members = response.json()['organization_users']
         for member in members:
-            member['name'] = self.get_user(member['id'])['username']
+            member['name'] = self.get_user(member['user_id'])['username']
 
         return members
