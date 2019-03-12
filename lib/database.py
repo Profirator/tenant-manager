@@ -53,7 +53,9 @@ class DatabaseController:
             'id': tenant_id
         })
 
-        del tenant['_id']
+        if tenant is not None:
+            del tenant['_id']
+
         return tenant
 
     def delete_tenant(self, tenant_id):
