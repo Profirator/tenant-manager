@@ -29,7 +29,7 @@ from lib.database import DatabaseController
 from lib.keyrock_client import KeyrockClient, KeyrockError
 from lib.umbrella_client import UmbrellaClient, UmbrellaError
 from lib.utils import authorized, build_response, consumes, URLify
-from settings import (IDM_URL, IDM_PASSWD, IDM_USER, BROKER_APP_ID,
+from settings import (IDM_URL, IDM_PASSWD, IDM_USER, IDM_USER_ID, BROKER_APP_ID,
                       BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
                       BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
                       MONGO_HOST, MONGO_PORT)
@@ -202,7 +202,7 @@ def get_tenant(user_info, tenant_id):
             'id': member['user_id'],
             'name': member['name'],
             'roles': _map_roles(member)
-        } for member in members if member['name'] != IDM_USER]  # The admin user used to create the org is not a tenant member
+        } for member in members if member['user_id'] != IDM_USER_ID]  # The admin user used to create the org is not a tenant member
 
         database_controller.update_tenant(tenant_id, tenant_info)
     except KeyrockError:
