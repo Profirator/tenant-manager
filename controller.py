@@ -140,13 +140,13 @@ def create(user_info):
             }
 
             # Keyrock IDM only supports a single organization role
-            if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
-                keyrock_client.grant_organization_role(org_id, user_id, 'member')
-                user_obj['roles'].append(BROKER_CONSUMER_ROLE)
+            user_obj['roles'].append(BROKER_CONSUMER_ROLE)
 
             if BROKER_ADMIN_ROLE in user['roles']:
                 keyrock_client.grant_organization_role(org_id, user_id, 'owner')
                 user_obj['roles'].append(BROKER_ADMIN_ROLE)
+            else:
+                keyrock_client.grant_organization_role(org_id, user_id, 'member')
 
             users.append(user_obj)
 
@@ -202,13 +202,13 @@ def get_tenant(user_info, tenant_id):
             'id': member['user_id'],
             'name': member['name'],
             'roles': _map_roles(member)
-        } for member in members]
+        } for member in members if member['name'] != IDM_USER]  # The admin user used to create the org is not a tenant member
 
         database_controller.update_tenant(tenant_id, tenant_info)
     except KeyrockError:
         return build_response({
-            'error': 'An error occurred reading tenants'
-        }, 500)
+            'error': 'An error occurred reading tenant info from Keyrock'
+        }, 503)
 
     return build_response(tenant_info, 200)
 
@@ -261,7 +261,7 @@ def delete_tenant(user_info, tenant_id):
     except (KeyrockError, UmbrellaError) as e:
         return build_response({
             'error': str(e)
-        }, 400)
+        }, 503)
 
     return make_response('', 204)
 
@@ -283,18 +283,20 @@ def update_tenant_roles(keyrock_client, tenant_info, user_id, old_roles, new_rol
 def add_tenant_user(keyrock_client, tenant_info, user):
     user_id = user['id']
 
-    # Add the user as member of the organization
-    if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
-        keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'member')
+    if BROKER_CONSUMER_ROLE not in user['roles'] and BROKER_ADMIN_ROLE not in user['roles'] and len(user['roles']) > 0:
+        raise ValueError('Invalid role provided for user')
 
+    # Add the user as member of the organization
     if BROKER_ADMIN_ROLE in user['roles']:
         keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'owner')
+    else:
+        keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'member')
 
 
 def remove_tenant_user(keyrock_client, tenant_info, user):
     if BROKER_ADMIN_ROLE in user['roles']:
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'owner')
-    elif BROKER_CONSUMER_ROLE in user['roles']:
+    else:
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'member')
 
 
@@ -387,6 +389,14 @@ def update_tenant(user_info, tenant_id):
             for user_id, roles in roles_update.items():
                 update_tenant_roles(keyrock_client, tenant_info, user_id, roles['old'], roles['new'])
 
+        # Normalize user information to prevent ewrong role info
+        new_users = []
+        for user in tenant_update['users']:
+            roles = [BROKER_CONSUMER_ROLE]
+            if BROKER_ADMIN_ROLE in user['roles']:
+                roles.append(BROKER_ADMIN_ROLE)
+            user['roles'] = roles
+
         database_controller.update_tenant(tenant_id, tenant_update)
 
     except ValueError as e:
@@ -405,6 +415,10 @@ def update_tenant(user_info, tenant_id):
         return build_response({
             'error': 'Invalid JSON PATCH format: ' + str(e)
         }, 400)
+    except KeyrockError as e:
+        return build_response({
+            'error': str(e)
+        }, 503)
 
     return make_response('', 200)
 

@@ -764,7 +764,7 @@ class ControllerTestCase(unittest.TestCase):
         exp_users = [{
             'id': 'username_id',
             'name': 'username',
-            'roles': [self._admin_role]
+            'roles': [self._consumer_role, self._admin_role]
         }, {
             'id': 'user2_id',
             'name': 'user2',
@@ -1034,7 +1034,7 @@ class ControllerTestCase(unittest.TestCase):
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'user_name', 'roles': [self._admin_role]}},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}},
             {'op': 'add', 'path': '/users/0', 'value': {'id': 'user_id3', 'name': 'user_name3', 'roles': [self._consumer_role]}},
-            {'op': 'replace', 'path': '/users/1/roles', 'value': [self._consumer_role]},
+            {'op': 'replace', 'path': '/users/1/roles', 'value': [self._admin_role]},
 
             # Replace op made with remove and add
             {'op': 'remove', 'path': '/users/2'},
@@ -1050,11 +1050,11 @@ class ControllerTestCase(unittest.TestCase):
             'users': [{
                 'id': 'user_id1',
                 'name': 'User ID1',
-                'roles': []
+                'roles': [self._consumer_role]
             }, {
                 'id': 'user_del',
                 'name': 'User Del1',
-                'roles': [self._admin_role]
+                'roles': [self._consumer_role, self._admin_role]
             }, {
                 'id': 'user_del2',
                 'name': 'User Del2',
@@ -1062,7 +1062,7 @@ class ControllerTestCase(unittest.TestCase):
             }, {
                 'id': 'user_id4',
                 'name': 'User ID4',
-                'roles': [self._admin_role]
+                'roles': [self._consumer_role, self._admin_role]
             }]
         }
 
@@ -1078,6 +1078,7 @@ class ControllerTestCase(unittest.TestCase):
         self.assertEqual([
             call(org_id, 'user_del', 'owner'),
             call(org_id, 'user_del2', 'member'),
+            call(org_id, 'user_id1', 'member'),
             call(org_id, 'user_id4', 'owner')
         ], revoke_calls)
 
@@ -1087,7 +1088,7 @@ class ControllerTestCase(unittest.TestCase):
             call(org_id, 'user_id3', 'member'),
             call(org_id, 'user_id', 'owner'),
             call(org_id, 'user_id2', 'member'),
-            call(org_id, 'user_id1', 'member'),
+            call(org_id, 'user_id1', 'owner'),
             call(org_id, 'user_id4', 'member')
         ], grant_calls)
 
@@ -1104,7 +1105,7 @@ class ControllerTestCase(unittest.TestCase):
             }, {
                 'id': 'user_id1',
                 'name': 'User ID1',
-                'roles': [self._consumer_role]
+                'roles': [self._consumer_role, self._admin_role]
             }, {
                 'id': 'user_id4',
                 'name': 'User ID4',
@@ -1112,7 +1113,7 @@ class ControllerTestCase(unittest.TestCase):
             }, {
                 'id': 'user_id',
                 'name': 'user_name',
-                'roles': [self._admin_role]
+                'roles': [self._consumer_role, self._admin_role]
             }, {
                 'id': 'user_id2',
                 'name': 'user_name2',
