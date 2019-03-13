@@ -266,46 +266,56 @@ def delete_tenant(user_info, tenant_id):
     return make_response('', 204)
 
 
-def add_tenant_user(keyrock_client, tenant_info, user):
-
-    if 'name' not in user or 'roles' not in user:
-        raise ValueError('Invalid user info in JSON Patch')
-
-    user_id = user['id']
-    user_obj = {
+def update_tenant_roles(keyrock_client, tenant_info, user_id, old_roles, new_roles):
+    # Revoke old roles
+    remove_tenant_user(keyrock_client, tenant_info, {
         'id': user_id,
-        'name': user['name'],
-        'roles': []
-    }
+        'roles': old_roles
+    })
+
+    # Grant new roles
+    add_tenant_user(keyrock_client, tenant_info, {
+        'id': user_id,
+        'roles': new_roles
+    })
+
+
+def add_tenant_user(keyrock_client, tenant_info, user):
+    user_id = user['id']
 
     # Add the user as member of the organization
     if BROKER_CONSUMER_ROLE in user['roles'] and BROKER_ADMIN_ROLE not in user['roles']:
         keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'member')
-        user_obj['roles'].append(BROKER_CONSUMER_ROLE)
 
     if BROKER_ADMIN_ROLE in user['roles']:
         keyrock_client.grant_organization_role(tenant_info['tenant_organization'], user_id, 'owner')
-        user_obj['roles'].append(BROKER_ADMIN_ROLE)
 
 
 def remove_tenant_user(keyrock_client, tenant_info, user):
     if BROKER_ADMIN_ROLE in user['roles']:
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'owner')
-    else:
+    elif BROKER_CONSUMER_ROLE in user['roles']:
         keyrock_client.revoke_organization_role(tenant_info['tenant_organization'], user['id'], 'member')
 
 
-def process_users_diff(users_src, users_dst):
+def process_users_diff(users_src, users_dst, roles_update=None):
     different = []
     for user in users_src:
-        for prev_user in users_dst:
-            if 'id' not in user or 'id' not in prev_user:
-                raise ValueError('Invalid user info in JSON Patch')
+        if 'id' not in user or 'name' not in user or 'roles' not in user:
+            raise ValueError('Invalid user info in JSON Patch')
 
+        for prev_user in users_dst:
             if user['id'] == prev_user['id']:
                 # If the user is present, its info must not had changed
-                if user != prev_user:
+                if user['name'] != prev_user['name']:
                     raise ValueError('User info cannot be modified in PATCH operation')
+
+                if user['roles'] != prev_user['roles'] and roles_update is not None:
+                    # Roles have changed
+                    roles_update[user['id']] = {
+                        'new': user['roles'],
+                        'old': prev_user['roles']
+                    }
 
                 break
         else:
@@ -364,7 +374,8 @@ def update_tenant(user_info, tenant_id):
             keyrock_client.update_organization(tenant_update['tenant_organization'], update)
 
         if tenant_update['users'] != tenant_info['users']:
-            to_add = process_users_diff(tenant_update['users'], tenant_info['users'])
+            roles_update = {}
+            to_add = process_users_diff(tenant_update['users'], tenant_info['users'], roles_update=roles_update)
             to_del = process_users_diff(tenant_info['users'], tenant_update['users'])
 
             for user in to_add:
@@ -372,6 +383,9 @@ def update_tenant(user_info, tenant_id):
 
             for user in to_del:
                 remove_tenant_user(keyrock_client, tenant_info, user)
+
+            for user_id, roles in roles_update.items():
+                update_tenant_roles(keyrock_client, tenant_info, user_id, roles['old'], roles['new'])
 
         database_controller.update_tenant(tenant_id, tenant_update)
 

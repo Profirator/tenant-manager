@@ -1033,7 +1033,12 @@ class ControllerTestCase(unittest.TestCase):
             {'op': 'remove', 'path': '/users/1'},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'user_name', 'roles': [self._admin_role]}},
             {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id2', 'name': 'user_name2', 'roles': [self._consumer_role]}},
-            {'op': 'add', 'path': '/users/0', 'value': {'id': 'user_id3', 'name': 'user_name3', 'roles': [self._consumer_role]}}
+            {'op': 'add', 'path': '/users/0', 'value': {'id': 'user_id3', 'name': 'user_name3', 'roles': [self._consumer_role]}},
+            {'op': 'replace', 'path': '/users/1/roles', 'value': [self._consumer_role]},
+
+            # Replace op made with remove and add
+            {'op': 'remove', 'path': '/users/2'},
+            {'op': 'add', 'path': '/users/2', 'value': {'id': 'user_id4', 'name': 'User ID4', 'roles': [self._consumer_role]}}
         ]
 
         self._database_controller.get_tenant.return_value = {
@@ -1043,13 +1048,21 @@ class ControllerTestCase(unittest.TestCase):
             'owner_id': 'user-id',
             'description': 'Initial description',
             'users': [{
-                'id': 'user_id1'
+                'id': 'user_id1',
+                'name': 'User ID1',
+                'roles': []
             }, {
                 'id': 'user_del',
+                'name': 'User Del1',
                 'roles': [self._admin_role]
             }, {
                 'id': 'user_del2',
+                'name': 'User Del2',
                 'roles': [self._consumer_role]
+            }, {
+                'id': 'user_id4',
+                'name': 'User ID4',
+                'roles': [self._admin_role]
             }]
         }
 
@@ -1064,7 +1077,8 @@ class ControllerTestCase(unittest.TestCase):
         revoke_calls = self._keyrock_client.revoke_organization_role.call_args_list
         self.assertEqual([
             call(org_id, 'user_del', 'owner'),
-            call(org_id, 'user_del2', 'member')
+            call(org_id, 'user_del2', 'member'),
+            call(org_id, 'user_id4', 'owner')
         ], revoke_calls)
 
         grant_calls = self._keyrock_client.grant_organization_role.call_args_list
@@ -1072,7 +1086,9 @@ class ControllerTestCase(unittest.TestCase):
         self.assertEqual([
             call(org_id, 'user_id3', 'member'),
             call(org_id, 'user_id', 'owner'),
-            call(org_id, 'user_id2', 'member')
+            call(org_id, 'user_id2', 'member'),
+            call(org_id, 'user_id1', 'member'),
+            call(org_id, 'user_id4', 'member')
         ], grant_calls)
 
         updated_tenant = {
@@ -1086,7 +1102,13 @@ class ControllerTestCase(unittest.TestCase):
                 'name': 'user_name3',
                 'roles': [self._consumer_role]
             }, {
-                'id': 'user_id1'
+                'id': 'user_id1',
+                'name': 'User ID1',
+                'roles': [self._consumer_role]
+            }, {
+                'id': 'user_id4',
+                'name': 'User ID4',
+                'roles': [self._consumer_role]
             }, {
                 'id': 'user_id',
                 'name': 'user_name',
@@ -1116,7 +1138,8 @@ class ControllerTestCase(unittest.TestCase):
             'description': 'Initial description',
             'users': [{
                 'id': 'user_id',
-                'name': 'user_name'
+                'name': 'user_name',
+                'roles': []
             }]
         }
 
@@ -1309,7 +1332,9 @@ class ControllerTestCase(unittest.TestCase):
             'owner_id': 'user-id',
             'description': 'Initial description',
             'users': [{
-                'id': 'user_id'
+                'id': 'user_id',
+                'name': 'User',
+                'roles': []
             }]
         }
 
