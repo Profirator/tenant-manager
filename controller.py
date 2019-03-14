@@ -104,6 +104,12 @@ def create(user_info):
     try:
         # Build tenant-id
         tenant_id = URLify(request.json.get('name'))
+        if not len(tenant_id):
+            # All the provided characters were invalid
+            return build_response({
+                'error': 'It was not possible to generate a tenant ID as all the characters were invalid'
+            }, 422)
+
         database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
         prev_t = database_controller.get_tenant(tenant_id)
 
