@@ -618,7 +618,10 @@ class ControllerTestCase(unittest.TestCase):
         # Mock request contents
         controller.request.json = {
             'name': 'New Tenant',
-            'description': 'tenant description'
+            'description': 'tenant description',
+            'options': {
+                'duration': '1D'
+            }
         }
 
         self._keyrock_client.create_organization.return_value = 'org_id'
@@ -676,7 +679,9 @@ class ControllerTestCase(unittest.TestCase):
         )
 
         self._database_controller.save_tenant.assert_called_once_with(
-            'new_tenant', 'New Tenant', 'tenant description', 'user-id', [], 'org_id')
+            'new_tenant', 'New Tenant', 'tenant description', 'user-id', [], 'org_id', options={
+                'duration': '1D'
+            })
 
     def test_create_tenant_with_users(self):
         # Mock request contents
@@ -772,7 +777,20 @@ class ControllerTestCase(unittest.TestCase):
         }]
 
         self._database_controller.save_tenant.assert_called_once_with(
-            'new_tenant', 'New Tenant', 'tenant description', 'user-id', exp_users, 'org_id')
+            'new_tenant', 'New Tenant', 'tenant description', 'user-id', exp_users, 'org_id', options={})
+
+    def test_create_tenant_invalid_options(self):
+        controller.request.json = {
+            'name': 'New Tenant',
+            'description': 'tenant description',
+            'options': 'invalid'
+        }
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': 'Options field must be an object'}, 422)
+        controller.DatabaseController.assert_not_called()
 
     def test_create_tenant_invalid_id(self):
         controller.request.json = {

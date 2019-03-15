@@ -100,6 +100,15 @@ def create(user_info):
                     'error': 'Missing required field in user specification'
                 }, 422)
 
+    options = {}
+    if 'options' in request.json:
+        if not isinstance(request.json.get('options'), dict):
+            return build_response({
+                'error': 'Options field must be an object'
+            }, 422)
+
+        options = request.json.get('options')
+
     tenant_id = None
     try:
         # Build tenant-id
@@ -157,8 +166,9 @@ def create(user_info):
             users.append(user_obj)
 
         _create_access_policies(tenant_id, org_id, user_info)
+
         database_controller.save_tenant(
-            tenant_id, request.json.get('name'), request.json.get('description'), user_info['id'], users, org_id)
+            tenant_id, request.json.get('name'), request.json.get('description'), user_info['id'], users, org_id, options=options)
 
     except (KeyrockError, UmbrellaError) as e:
         return build_response({
