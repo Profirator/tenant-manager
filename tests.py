@@ -1105,22 +1105,20 @@ class ControllerTestCase(unittest.TestCase):
         self._keyrock_client.update_organization.assert_called_once_with(org_id, {'description': 'New description', 'name': 'New name'})
 
         revoke_calls = self._keyrock_client.revoke_organization_role.call_args_list
-        self.assertEqual([
-            call(org_id, 'user_del', 'owner'),
-            call(org_id, 'user_del2', 'member'),
-            call(org_id, 'user_id1', 'member'),
-            call(org_id, 'user_id4', 'owner')
-        ], revoke_calls)
+        self.assertEqual(call(org_id, 'user_del', 'owner'), revoke_calls[0])
+        self.assertEqual(call(org_id, 'user_del2', 'member'), revoke_calls[1])
+
+        self.assertTrue(call(org_id, 'user_id1', 'member') in revoke_calls[2:])
+        self.assertTrue(call(org_id, 'user_id4', 'owner') in revoke_calls[2:])
 
         grant_calls = self._keyrock_client.grant_organization_role.call_args_list
 
-        self.assertEqual([
-            call(org_id, 'user_id3', 'member'),
-            call(org_id, 'user_id', 'owner'),
-            call(org_id, 'user_id2', 'member'),
-            call(org_id, 'user_id1', 'owner'),
-            call(org_id, 'user_id4', 'member')
-        ], grant_calls)
+        self.assertEqual(call(org_id, 'user_id3', 'member'), grant_calls[0])
+        self.assertEqual(call(org_id, 'user_id', 'owner'), grant_calls[1])
+        self.assertEqual(call(org_id, 'user_id2', 'member'), grant_calls[2])
+
+        self.assertTrue(call(org_id, 'user_id1', 'owner') in grant_calls[3:])
+        self.assertTrue(call(org_id, 'user_id4', 'member') in grant_calls[3:])
 
         updated_tenant = {
             'id': tenant_id,
