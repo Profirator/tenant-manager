@@ -804,6 +804,18 @@ class ControllerTestCase(unittest.TestCase):
         controller.build_response.assert_called_once_with({'error': 'It was not possible to generate a tenant ID as all the characters were invalid'}, 422)
         controller.DatabaseController.assert_not_called()
 
+    def test_create_tenant_invalid_id_unicode(self):
+        controller.request.json = {
+            'name': '⅓½⨊™😃⚄',
+            'description': 'Tenant description'
+        }
+
+        response = controller.create(self._user_info)
+
+        self.assertEqual(response, self._response)
+        controller.build_response.assert_called_once_with({'error': 'It was not possible to generate a tenant ID as all the characters were invalid'}, 422)
+        controller.DatabaseController.assert_not_called()
+
     def test_create_tenant_missing_name(self):
         # Mock request contents
         controller.request.json = {

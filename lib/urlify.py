@@ -153,7 +153,7 @@ REMOVE_WORD_RE = re.compile(r'\b(' + '|'.join((
     "in", "into", "like", "of", "off", "on", "onto", "per", "since",
     "than", "the", "this", "that", "to", "up", "via", "with"
 )) + r')\b', re.I)
-REMOVE_UNNEEDED_RE = re.compile(r'[^-\w\s]')
+REMOVE_UNNEEDED_RE = re.compile(r'(?a)[^-\w\s]')
 REMOVE_SPACES_RE = re.compile(r'[-\s]+')
 REMOVE_TRAILING_HYPHENS_RE = re.compile(r'-+$')
 
