@@ -1380,7 +1380,27 @@ class ControllerTestCase(unittest.TestCase):
         }
 
         controller.request.json = [
-            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'name', 'roles': []}}
+            {'op': 'add', 'path': '/users/-', 'value': {'id': 'user_id', 'name': 'User', 'roles': []}}
+        ]
+
+        self._test_update_error('The user User is already included in the tenant', 422)
+
+    def test_update_tenant_user_info(self):
+        self._database_controller.get_tenant.return_value = {
+            'id': 'tenant_id',
+            'name': 'Tenant name',
+            'tenant_organization': 'org_id',
+            'owner_id': 'user-id',
+            'description': 'Initial description',
+            'users': [{
+                'id': 'user_id',
+                'name': 'User',
+                'roles': []
+            }]
+        }
+
+        controller.request.json = [
+            {'op': 'replace', 'path': '/users/0/name', 'value': 'name'}
         ]
 
         self._test_update_error('User info cannot be modified in PATCH operation', 422)

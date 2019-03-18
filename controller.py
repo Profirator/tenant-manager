@@ -318,9 +318,15 @@ def remove_tenant_user(keyrock_client, tenant_info, user):
 
 def process_users_diff(users_src, users_dst, roles_update=None):
     different = []
+    ids = []
     for user in users_src:
         if 'id' not in user or 'name' not in user or 'roles' not in user:
             raise ValueError('Invalid user info in JSON Patch')
+
+        if user['id'] in ids:
+            raise ValueError('The user {} is already included in the tenant'.format(user['name']))
+
+        ids.append(user['id'])
 
         for prev_user in users_dst:
             if user['id'] == prev_user['id']:
