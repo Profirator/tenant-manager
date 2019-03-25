@@ -189,6 +189,11 @@ def get(user_info):
     database_controller = DatabaseController(host=MONGO_HOST, port=MONGO_PORT)
     response_data = database_controller.read_tenants(user_info['id'])
 
+    # Filter tenant members if user making the request is not the tenant owner
+    for tenant in response_data:
+        if tenant['owner_id'] != user_info['id']:
+            tenant['users'] = [user for user in tenant['users'] if user['id'] == user_info['id']]
+
     return build_response(response_data, 200)
 
 
@@ -236,6 +241,9 @@ def get_tenant(user_info, tenant_id):
         return build_response({
             'error': 'An error occurred reading tenant info from Keyrock'
         }, 503)
+
+    if tenant_info['owner_id'] != user_info['id']:
+        tenant_info['users'] = [user for user in tenant_info['users'] if user['id'] == user_info['id']]
 
     return build_response(tenant_info, 200)
 

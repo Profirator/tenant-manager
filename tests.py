@@ -916,6 +916,7 @@ class ControllerTestCase(unittest.TestCase):
 
         tenants = [{
             'tenant_organization': org_id,
+            'owner_id': 'user-id',
             'users': [{
                 'id': 'user-id',
                 'name': 'username',
@@ -923,18 +924,46 @@ class ControllerTestCase(unittest.TestCase):
             }]
         }]
 
-        members = [{
-            'user_id': 'user-id',
-            'name': 'username',
-            'role': 'owner'
-        }]
-
         self._database_controller.read_tenants.return_value = tenants
-        self._keyrock_client.get_organization_members.return_value = members
 
         tenants_response = controller.get(self._user_info)
 
         self.assertEqual(tenants_response, self._response)
+        controller.build_response.assert_called_once_with(tenants, 200)
+        self._database_controller.read_tenants.assert_called_once_with('user-id')
+
+    def test_get_tenants_member(self):
+        org_id = 'org_id'
+
+        tenants = [{
+            'tenant_organization': org_id,
+            'owner_id': 'owner-id',
+            'users': [{
+                'id': 'user-id',
+                'name': 'username',
+                'roles': [self._consumer_role, self._admin_role]
+            }, {
+                'id': 'owner-id',
+                'name': 'username',
+                'roles': [self._consumer_role, self._admin_role]
+            }]
+        }]
+
+        self._database_controller.read_tenants.return_value = tenants
+
+        tenants_response = controller.get(self._user_info)
+
+        self.assertEqual(tenants_response, self._response)
+
+        exp_tenants = [{
+            'tenant_organization': org_id,
+            'owner_id': 'owner-id',
+            'users': [{
+                'id': 'user-id',
+                'name': 'username',
+                'roles': [self._consumer_role, self._admin_role]
+            }]
+        }]
         controller.build_response.assert_called_once_with(tenants, 200)
         self._database_controller.read_tenants.assert_called_once_with('user-id')
 
@@ -989,6 +1018,10 @@ class ControllerTestCase(unittest.TestCase):
             'user_id': 'user-id',
             'name': 'username',
             'role': 'owner'
+        }, {
+            'user_id': 'user2-id',
+            'name': 'username',
+            'role': 'member'
         }]
 
         self._database_controller.get_tenant.return_value = tenant
