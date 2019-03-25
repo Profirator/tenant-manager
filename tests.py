@@ -972,6 +972,34 @@ class ControllerTestCase(unittest.TestCase):
         controller.build_response.assert_called_once_with(exp_tenant, 200)
         self._database_controller.get_tenant.assert_called_once_with(tenant_id)
 
+    def test_get_tenant_member(self):
+        org_id = 'org_id'
+        tenant_id = 'tenant_id'
+        tenant = {
+            'tenant_organization': org_id,
+            'owner_id': 'owner-id',
+            'users': [{
+                'id': 'user-id',
+                'name': 'username',
+                'roles': [self._consumer_role, self._admin_role]
+            }]
+        }
+
+        members = [{
+            'user_id': 'user-id',
+            'name': 'username',
+            'role': 'owner'
+        }]
+
+        self._database_controller.get_tenant.return_value = tenant
+        self._keyrock_client.get_organization_members.return_value = members
+
+        tenant_response = controller.get_tenant(self._user_info, tenant_id)
+
+        self.assertEqual(tenant_response, self._response)
+        controller.build_response.assert_called_once_with(tenant, 200)
+        self._database_controller.get_tenant.assert_called_once_with(tenant_id)
+
     def test_delete_tenant(self):
         tenant_id = 'tenant_id'
         org_id = 'org_id'

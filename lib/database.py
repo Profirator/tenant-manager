@@ -47,7 +47,8 @@ class DatabaseController:
             del t['_id']
             return t
 
-        return [serialize_ids(tenant) for tenant in self._db.tenants.find({'owner_id': owner})]
+        return [serialize_ids(tenant)
+            for tenant in self._db.tenants.find({"$or":[ {'owner_id': owner}, {'users.id': owner} ]})]
 
     def get_tenant(self, tenant_id):
         tenant = self._db.tenants.find_one({

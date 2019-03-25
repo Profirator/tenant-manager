@@ -192,6 +192,17 @@ def get(user_info):
     return build_response(response_data, 200)
 
 
+def is_member(user_id, tenant_info):
+    member = True
+    for user in tenant_info['users']:
+        if user['id'] == user_id:
+            break
+    else:
+        member = False
+
+    return member
+
+
 @app.route("/tenant/<tenant_id>", methods=['GET'])
 @authorized
 def get_tenant(user_info, tenant_id):
@@ -205,7 +216,7 @@ def get_tenant(user_info, tenant_id):
                 'error': 'Tenant {} does not exist'.format(tenant_id)
             }, 404)
 
-        if tenant_info['owner_id'] != user_info['id']:
+        if tenant_info['owner_id'] != user_info['id'] and not is_member(user_info['id'], tenant_info):
             return build_response({
                 'error': 'You are not authorized to retrieve tenant info'
             }, 403)
