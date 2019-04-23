@@ -26,6 +26,9 @@ from settings import VERIFY_REQUESTS
 
 PAGE_LEN = 100
 
+PENDING_CHANGES_ENDPOINT = "api-umbrella/v1/config/pending_changes"
+PUBLISH_ENDPOINT = "api-umbrella/v1/config/publish"
+
 
 class UmbrellaError(Exception):
     pass
@@ -100,6 +103,8 @@ class UmbrellaClient():
         if response.status_code != 204:
             raise UmbrellaError('Error adding sub setting to API')
 
+        self.publish()
+
     def add_sub_url_setting_app_id(self, app_id, sub_settings):
         """
         Appends a new sub URL setting into an API Umbrella API
@@ -112,3 +117,42 @@ class UmbrellaClient():
 
         api_elem['sub_settings'].extend(sub_settings)
         self.update_api(api_elem)
+
+    def publish(self):
+        headers = {
+            'X-Api-Key': self._api_key,
+            'X-Admin-Auth-Token': self._admin_token
+        }
+
+        # Retriveve the list of changes to be published
+        url = urljoin(self._host, PENDING_CHANGES_ENDPOINT)
+        response = requests.get(url, headers=headers, verify=VERIFY_REQUESTS)
+        changes = response.json()
+
+        # Prepare body for publishing the changes
+        body = {
+            "config": {
+                "apis": {},
+                "website_backends": {},
+            }
+        }
+        for api in changes["config"]["apis"]["new"]:
+            body["config"]["apis"][api['id']] = {
+                "publish": 1
+            }
+
+        for web in changes["config"]["website_backends"]["new"]:
+            body["config"]["website_backends"][web['id']] = {
+                "publish": 1
+            }
+
+        url = urljoin(self._host, PUBLISH_ENDPOINT)
+        response = requests.post(url, json=body, headers=headers, verify=VERIFY_REQUESTS)
+        if response.status_code == 403:
+            error = response.json()
+            if "error" in error and "message" in error["error"]:
+                raise UmbrellaError(error['error']['message'])
+            else:
+                raise UmbrellaError("Error publishing changes")
+        elif response.status_code != 201:
+            raise UmbrellaError("Error publishing changes")

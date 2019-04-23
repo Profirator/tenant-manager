@@ -510,14 +510,33 @@ class UmbrellaClientTestCase(unittest.TestCase):
                 }
             }]
         }
+
+        changes = {
+            'config': {
+                'apis': {
+                    'new': [{
+                        'id': '1'
+                    }]
+                },
+                'website_backends': {
+                    'new': [{
+                        'id': '2'
+                    }]
+                }
+            }
+        }
+
         get_response = MagicMock(status_code=200)
-        get_response.json.return_value = apis
+        get_response.json.side_effect = [apis, changes]
 
         umbrella_client.requests = MagicMock()
         umbrella_client.requests.get.return_value = get_response
 
         # Mock put request
         umbrella_client.requests.put.return_value = MagicMock(status_code=204)
+
+        # Mock post request
+        umbrella_client.requests.post.return_value = MagicMock(status_code=201)
 
         client = umbrella_client.UmbrellaClient(self._host, self._admin_token, self._api_key)
         client.add_sub_url_setting_app_id('2', [{
@@ -549,14 +568,36 @@ class UmbrellaClientTestCase(unittest.TestCase):
             }
         }
 
+        exp_changes = {
+            'config': {
+                'apis': {
+                    '1': {
+                        'publish': 1
+                    }
+                },
+                'website_backends': {
+                    '2': {
+                        'publish': 1
+                    }
+                }
+            }
+        }
+
         # Verify calls
-        umbrella_client.requests.get.assert_called_once_with(
-            'http://umbrella.docker/api-umbrella/v1/apis.json?start=0&length=100',
-            headers=headers, verify=VERIFY_REQUESTS)
+        get_calls = umbrella_client.requests.get.call_args_list
+        self.assertEqual([
+            call('http://umbrella.docker/api-umbrella/v1/apis.json?start=0&length=100',headers=headers, verify=VERIFY_REQUESTS),
+            call('http://umbrella.docker/api-umbrella/v1/config/pending_changes',headers=headers, verify=VERIFY_REQUESTS)
+        ], get_calls)
 
         umbrella_client.requests.put.assert_called_once_with(
             'http://umbrella.docker/api-umbrella/v1/apis/id',
             headers=headers, json=exp_body, verify=VERIFY_REQUESTS
+        )
+
+        umbrella_client.requests.post.assert_called_once_with(
+            'http://umbrella.docker/api-umbrella/v1/config/publish',
+            headers=headers, json=exp_changes, verify=VERIFY_REQUESTS
         )
 
 
