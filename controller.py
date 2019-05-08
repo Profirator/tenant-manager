@@ -199,11 +199,12 @@ def get(user_info):
 
 def is_member(user_id, tenant_info):
     member = True
-    for user in tenant_info['users']:
-        if user['id'] == user_id:
-            break
-    else:
-        member = False
+    if user_id != IDM_USER_ID:
+        for user in tenant_info['users']:
+            if user['id'] == user_id:
+                break
+        else:
+            member = False
 
     return member
 
