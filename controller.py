@@ -381,9 +381,9 @@ def update_tenant(user_info, tenant_id):
                 'error': 'Tenant {} does not exist'.format(tenant_id)
             }, 404)
 
-        if tenant_info['owner_id'] != user_info['id']:
+        if tenant_info['owner_id'] != user_info['id'] and IDM_USER_ID != user_info['id']:
             return build_response({
-                'error': 'You are not authorized to delete tenant'
+                'error': 'You are not authorized to update tenant'
             }, 403)
 
         patch = jsonpatch.JsonPatch(request.json)
