@@ -1388,7 +1388,7 @@ class ControllerTestCase(unittest.TestCase):
             'users': []
         }
 
-        self._test_update_error('You are not authorized to delete tenant', 403)
+        self._test_update_error('You are not authorized to update tenant', 403)
 
     def test_update_tenant_invalid_format(self):
         self._database_controller.get_tenant.return_value = {
