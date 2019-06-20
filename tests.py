@@ -514,13 +514,8 @@ class UmbrellaClientTestCase(unittest.TestCase):
         changes = {
             'config': {
                 'apis': {
-                    'new': [{
+                    'modified': [{
                         'id': '1'
-                    }]
-                },
-                'website_backends': {
-                    'new': [{
-                        'id': '2'
                     }]
                 }
             }
@@ -575,11 +570,7 @@ class UmbrellaClientTestCase(unittest.TestCase):
                         'publish': 1
                     }
                 },
-                'website_backends': {
-                    '2': {
-                        'publish': 1
-                    }
-                }
+                'website_backends': {}
             }
         }
 

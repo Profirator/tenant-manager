@@ -136,13 +136,8 @@ class UmbrellaClient():
                 "website_backends": {},
             }
         }
-        for api in changes["config"]["apis"]["new"]:
+        for api in changes["config"]["apis"]["modified"]:
             body["config"]["apis"][api['id']] = {
-                "publish": 1
-            }
-
-        for web in changes["config"]["website_backends"]["new"]:
-            body["config"]["website_backends"][web['id']] = {
                 "publish": 1
             }
 
