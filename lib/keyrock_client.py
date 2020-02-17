@@ -64,7 +64,7 @@ class KeyrockClient():
         url = urljoin(self._host, '/user?access_token=' + token)
         response = requests.get(url)
 
-        if response.status_code != 201:
+        if response.status_code != 200:
             raise KeyrockError('Invalid access token')
 
         return response.json()
