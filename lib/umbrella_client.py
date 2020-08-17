@@ -45,9 +45,11 @@ class UmbrellaClient():
         self._admin_token = admin_token
         self._api_key = api_key
 
-    def get_api_from_app_id(self, app_id):
+    def get_api_from_app_id(self, app_id, broker_name):
         """
         Searches in API Umbrella for an API which is configured with a particular IDM app ID
+        and broker name to get the correct API. There may be several APIs
+        which have the same IDM app ID.
         """
         # To limit the number of results, include a search by expected app_id
         url = urljoin(self._host, '/api-umbrella/v1/apis.json')
@@ -76,7 +78,7 @@ class UmbrellaClient():
 
             for api in apis['data']:
 
-                if api['settings']['idp_app_id'] == app_id:
+                if api['settings']['idp_app_id'] == app_id and api['name'] == broker_name:
                     processed = True
                     api_elem = api
                     break
@@ -105,13 +107,13 @@ class UmbrellaClient():
 
         self.publish()
 
-    def add_sub_url_setting_app_id(self, app_id, sub_settings):
+    def add_sub_url_setting_app_id(self, app_id, sub_settings, broker_name):
         """
         Appends a new sub URL setting into an API Umbrella API
-        identified by IDM app ID
+        identified by IDM app ID and Broker name
         """
 
-        api_elem = self.get_api_from_app_id(app_id)
+        api_elem = self.get_api_from_app_id(app_id, broker_name)
         if not 'sub_settings' in api_elem or api_elem['sub_settings'] is None:
             api_elem['sub_settings'] = []
 

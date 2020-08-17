@@ -284,7 +284,7 @@ def delete_tenant(user_info, tenant_id):
 
         # Delete policies in API Umbrella
         umbrella_client = UmbrellaClient(UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY)
-        broker_api = umbrella_client.get_api_from_app_id(BROKER_APP_ID)
+        broker_api = umbrella_client.get_api_from_app_id(BROKER_APP_ID, BROKER_NAME)#include the broker name
 
         sub_settings = [setting for setting in broker_api['sub_settings']
                         if not is_tenant_setting(setting, tenant_id)]

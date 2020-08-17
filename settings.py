@@ -57,3 +57,5 @@ if os.path.isfile(secrets_file):
         IDM_USER_ID = data.get('idm', {}).get('user_id', IDM_USER_ID)
         UMBRELLA_TOKEN = data.get('umbrella', {}).get('token', UMBRELLA_TOKEN)
         UMBRELLA_KEY = data.get('umbrella', {}).get('key', UMBRELLA_KEY)
+        #String used to identify Context Broker when listing APIs from Umbrella
+        BROKER_NAME = data.get('broker',{}).get('name', BROKER_NAME)
