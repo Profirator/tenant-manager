@@ -44,7 +44,7 @@ BAE_APP_ID = os.environ.get('BAE_APP_ID', '')
 BAE_SELLER_ROLE = os.environ.get('BAE_SELLER_ROLE', 'seller')
 BAE_CUSTOMER_ROLE = os.environ.get('BAE_CUSTOMER_ROLE', 'customer')
 BAE_ADMIN_ROLE = os.environ.get('BAE_ADMIN_ROLE', 'orgAdmin')
-
+BROKER_NAME = os.environ.get('BROKER_NAME', 'Orion Context Broker')
 
 secrets_file = "/run/secrets/{}".format(os.environ.get("CREDENTIALS_FILE", "credentials.json"))
 if os.path.isfile(secrets_file):
