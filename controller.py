@@ -32,7 +32,7 @@ from lib.utils import authorized, build_response, consumes, URLify
 from settings import (IDM_URL, IDM_PASSWD, IDM_USER, IDM_USER_ID, BROKER_APP_ID,
                       BAE_APP_ID, BROKER_ADMIN_ROLE, BROKER_CONSUMER_ROLE, BAE_SELLER_ROLE,
                       BAE_CUSTOMER_ROLE, BAE_ADMIN_ROLE, UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY,
-                      MONGO_HOST, MONGO_PORT)
+                      MONGO_HOST, MONGO_PORT, BROKER_NAME)
 
 
 app = Flask(__name__)
@@ -66,7 +66,7 @@ def _create_access_policies(tenant, org_id, user_info):
 
     # Add new policies to existing API sub settings
     umbrella_client = UmbrellaClient(UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY)
-    umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy])
+    umbrella_client.add_sub_url_setting_app_id(BROKER_APP_ID, [read_policy, admin_policy], BROKER_NAME)
 
 
 def _map_roles(member):
