@@ -19,6 +19,14 @@
 
 import requests
 
+import logging
+logger = logging.getLogger('myapp')
+hdlr = logging.FileHandler('/var/tmp/myapp.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr) 
+logger.setLevel(logging.DEBUG)
+
 from urllib.parse import urlparse, urljoin
 
 from settings import VERIFY_REQUESTS
@@ -54,7 +62,8 @@ class UmbrellaClient():
 
         start = 0
         processed = False
-        api_elem = None
+        # api_elem = None
+        api_elem = []
 
         while not processed:
             page_url = url + '?start={}&length={}'.format(start, PAGE_LEN)
@@ -78,8 +87,11 @@ class UmbrellaClient():
 
                 if api['settings']['idp_app_id'] == app_id:
                     processed = True
-                    api_elem = api
-                    break
+                    # api_elem = api
+                    logger.debug('inside get_api_from_app_id')
+                    logger.debug(api['name'])
+                    api_elem.append(api)
+                    # break
 
             start += PAGE_LEN
 
@@ -112,11 +124,15 @@ class UmbrellaClient():
         """
 
         api_elem = self.get_api_from_app_id(app_id)
-        if not 'sub_settings' in api_elem or api_elem['sub_settings'] is None:
-            api_elem['sub_settings'] = []
+        print(api_elem)
+        for api_elem_sg in api_elem:
+            logger.debug('inside add_sub_url_setting_app_id')
+            logger.debug(api_elem_sg['name'])
+            if not 'sub_settings' in api_elem_sg or api_elem_sg['sub_settings'] is None:
+                api_elem_sg['sub_settings'] = []
 
-        api_elem['sub_settings'].extend(sub_settings)
-        self.update_api(api_elem)
+            api_elem_sg['sub_settings'].extend(sub_settings)
+            self.update_api(api_elem_sg)
 
     def publish(self):
         headers = {
