@@ -286,11 +286,12 @@ def delete_tenant(user_info, tenant_id):
         umbrella_client = UmbrellaClient(UMBRELLA_URL, UMBRELLA_TOKEN, UMBRELLA_KEY)
         broker_api = umbrella_client.get_api_from_app_id(BROKER_APP_ID)
 
-        sub_settings = [setting for setting in broker_api['sub_settings']
-                        if not is_tenant_setting(setting, tenant_id)]
+        for broker_api_sg in broker_api:
+            sub_settings = [setting for setting in broker_api_sg['sub_settings']
+                            if not is_tenant_setting(setting, tenant_id)]
 
-        broker_api['sub_settings'] = sub_settings
-        umbrella_client.update_api(broker_api)
+            broker_api_sg['sub_settings'] = sub_settings
+            umbrella_client.update_api(broker_api_sg)
 
         # Delete tenant from database
         database_controller.delete_tenant(tenant_id)
